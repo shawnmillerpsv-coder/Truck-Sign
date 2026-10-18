@@ -256,7 +256,7 @@ const BUILTIN = [
   { name:'4-2 Tall scrolling ad', layout:[[0,0],[1,0],[2,0],[3,0],[1,1],[2,1]], lines:[L(true, AD, '#ffa000'), L(false, PHONE), L(false, '')], bright:60,
     big:{ on:true, text:'WHOLESALE {FFFFFF}CABINETS{} {$} HALF PRICE' } },
 ];
-const ANIMS = [ ['-', 'None'], ['$', '$ Dollars'], ['~', '〰 Wave'], ['D', '🐬 Dolphin'], ['*', '✦ Sparkle'], ['>', '» Arrows'] ];
+const ANIMS = [ ['-', 'None'], ['$', '$ Dollars'], ['~', '〰 Wave'], ['D', '🐬 Dolphin'], ['*', '✦ Sparkle'], ['>', '» Arrows'], ['P', 'ᗧ Pac-Man'], ['G', '👻 White ghost'], ['V', '👻 Purple ghost'] ];
 const GAPS = ['B', '3', '2', '1', '0'];   // slider left -> right
 const GAPNAME = { B:'Blank (scrolls fully off)', 3:'3 panels', 2:'2 panels', 1:'1 panel', 0:'No gap' };
 const stepMs = sp => sp <= 10 ? 90 - (sp - 1) * (75 / 9) : 150 / sp;   // ms per 1-dot move; 20 = twice the old top speed
@@ -583,7 +583,7 @@ function glyph(ch) {
   cols.push(Array(8).fill(false));
   return glyphCache[ch] = cols;
 }
-const ANIMW = { '$':20, '~':18, 'D':22, '*':14, '>':16 };
+const ANIMW = { '$':20, '~':18, 'D':22, '*':14, '>':16, P:22, G:12, V:12 };
 const DOLPHIN = [0b0000100000, 0b0001110000, 0b1011111110, 0b0111111111, 0b1000011000];
 function hsvToHex(hue255) {   // FastLED-style hue (0-255), full saturation
   const h = hue255 / 255 * 360, f = n => { const k = (n + h / 60) % 6; return Math.round(255 * (1 - Math.max(0, Math.min(k, 4 - k, 1)))); };
@@ -610,6 +610,26 @@ function animCols(a, now) {   // -> columns of 8 colors|null, same math as the f
       const hh = (c * 73 + r * 151 + t * 37 + c * r * 11) % 23;
       if (hh === 0) set(c, r, '#ffffff'); else if (hh === 1) set(c, r, '#c89600');
     }
+  } else if (a === 'P') {   // Pac-Man facing left, chomping toward a row of pellets
+    const open = Math.abs(Math.sin(now * 0.012)) * 0.85;
+    for (let x = 0; x < 8; x++) for (let y = 0; y < 7; y++) {
+      const dx = x - 3, dy = y - 3;
+      if (dx * dx + dy * dy > 12.5) continue;
+      if (dx < 0 && Math.abs(Math.atan2(dy, -dx)) < open) continue;   // mouth
+      set(13 + x, y, x === 3 && y === 1 ? null : '#ffe000');
+    }
+    const eaten = Math.floor(now / 260) % 4;   // pellets disappear one by one as he chomps
+    for (let i = 0; i < 3; i++) if (i >= eaten) set(10 - i * 4, 3, '#ffb8a0');
+  } else if (a === 'G' || a === 'V') {   // ghost with a wavy skirt, eyes looking left
+    const body = a === 'G' ? '#f0f0ff' : '#a040ff', bob = Math.floor(now / 300) % 2, sk = Math.floor(now / 150) % 2;
+    const rows = [[2, 4], [1, 5], [0, 6], [0, 6], [0, 6], [0, 6]];
+    rows.forEach(([l, r], y) => { for (let x = l; x <= r; x++) set(3 + x, y + bob, body); });
+    for (let x = 0; x <= 6; x++) if ((x + sk) % 2 === 0) set(3 + x, 6 + bob, body);
+    [[1, 2], [4, 2]].forEach(([ex, ey]) => {
+      if (a === 'V') { set(3 + ex, ey + bob, '#ffffff'); set(4 + ex, ey + bob, '#ffffff'); set(3 + ex, ey + 1 + bob, '#ffffff'); set(4 + ex, ey + 1 + bob, '#ffffff'); }
+      set(3 + ex, ey + 1 + bob, '#2040ff');
+      if (a === 'G') set(3 + ex, ey + bob, '#2040ff');
+    });
   } else if (a === '>') {
     const act = Math.floor(now / 150) % 3;
     for (let i = 0; i < 3; i++) {
@@ -619,7 +639,7 @@ function animCols(a, now) {   // -> columns of 8 colors|null, same math as the f
   }
   return g;
 }
-const SCENES = [ ['-', 'Off'], ['D', '🐬 Dolphin'], ['W', '🌊 Beach wave'], ['E', '👀 Purple eyes'], ['F', '🎆 Fireworks'], ['B', '💧 Bouncing drop'], ['R', '🌧 Rain'], ['$', '$ Money rain'], ['~', '〰 Rainbow wave'], ['*', '✦ Sparkles'], ['>', '« Arrows'] ];
+const SCENES = [ ['-', 'Off'], ['D', '🐬 Dolphin'], ['W', '🌊 Beach wave'], ['E', '👀 Purple eyes'], ['F', '🎆 Fireworks'], ['B', '💧 Bouncing drop'], ['S', '🕷 Halloween spider'], ['R', '🌧 Rain'], ['$', '$ Money rain'], ['~', '〰 Rainbow wave'], ['*', '✦ Sparkles'], ['>', '« Arrows'] ];
 
 // ---------- animated thumbnails ----------
 const thumbs = new Set();
@@ -702,7 +722,7 @@ function sceneBox() {
   const x0 = Math.min(...gxs) * PW, y0 = Math.min(...gys) * PH;
   return [x0, y0, (Math.max(...gxs) + 1) * PW - x0, (Math.max(...gys) + 1) * PH - y0];
 }
-const SCENE_LEN = { D:6500, '$':4500, R:5000, E:7500, F:6500, B:6500, W:11000, '~':4500, '*':4500, '>':4500 };
+const SCENE_LEN = { S:10000, D:6500, '$':4500, R:5000, E:7500, F:6500, B:6500, W:11000, '~':4500, '*':4500, '>':4500 };
 const sceneLen = k => SCENE_LEN[k] || 4500;
 const hsh = n => { n = (n ^ 61) ^ (n >>> 16); n = Math.imul(n, 9); n ^= n >>> 4; n = Math.imul(n, 0x27d4eb2d); return (n ^ (n >>> 15)) >>> 0; };
 function shade(hexc, f) {
@@ -928,6 +948,71 @@ function drawScene(fb, t, type, x0, y0, w, h, occ) {
           set(bx + wob + Math.cos(ang) * r, by + Math.sin(ang) * r, ang > 3.4 && ang < 4.8 ? '#ffffff' : '#9fdfff');
         }
       }
+    }
+  } else if (type === 'S') {   // Halloween spider: drops on a thread, spins an orange web, writes HAPPY HALLOWEEN, then sits proud with glowing green eyes
+    const T0 = 900, T1 = 4300, T2 = 7000, T3 = 7600;       // drop | web | write | run to corner | proud (to 10000)
+    const cx = x0 + w / 2, cy = y0 + h / 2 - 0.5, WEB = '#c85a00', TXT = '#ffb000';
+    const line = (ax, ay, bx, by, c, f = 1) => {
+      const n = Math.ceil(Math.hypot(bx - ax, by - ay) * 1.5 * f) + 1;
+      for (let i = 0; i <= n; i++) { const q = (i / n) * f; set(ax + (bx - ax) * q, ay + (by - ay) * q, c); }
+    };
+    // web path: 8 spokes out from the middle, then 3 rings around
+    const rx = Math.min(w / 2 - 1, 34), ry = h / 2 - 0.5, spokes = [];
+    for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2 + 0.2; spokes.push([Math.cos(a), Math.sin(a)]); }
+    const pts = [[cx, cy]];
+    spokes.forEach(([dx, dy]) => { pts.push([cx + dx * rx, cy + dy * ry]); pts.push([cx, cy]); });
+    [0.32, 0.6, 0.86].forEach(r => { for (let k = 0; k <= 8; k++) { const [dx, dy] = spokes[k % 8]; pts.push([cx + dx * rx * r, cy + dy * ry * r]); } });
+    const segs = []; let tot = 0;
+    for (let i = 1; i < pts.length; i++) { const L = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push([pts[i - 1], pts[i], tot, L]); tot += L; }
+    // text
+    const msg = 'HAPPY HALLOWEEN', tw = msg.length * 6 - 1, tx = Math.round(cx - tw / 2), ty = Math.round(cy - 3.5);
+    const drawText = upto => {
+      for (let i = 0; i < msg.length; i++) glyph(msg[i]).forEach((col, c) => {
+        const x = tx + i * 6 + c; if (x > upto) return;
+        for (let y = -1; y < 8; y++) delete fb[Math.floor(x) + ',' + Math.floor(ty + y)];   // clear the web behind the letters
+        col.forEach((on, y) => { if (on) set(x, ty + y, TXT); });
+      });
+    };
+    let sx, sy, walk = true;
+    if (t < T0) {   // dropping down on a silk thread
+      const p = t / T0; sx = cx; sy = y0 - 3 + (cy - y0 + 3) * (1 - (1 - p) * (1 - p));
+      line(cx, y0, cx, sy - 2, '#9a9a9a'); walk = false;
+    } else {
+      // web, revealed as the spider scurries along (speeding up a little as it goes)
+      const p = Math.min(1, (t - T0) / (T1 - T0)), d = tot * (p * 0.7 + p * p * 0.3);
+      segs.forEach(([a, b, s0, L]) => { if (d > s0) line(a[0], a[1], b[0], b[1], WEB, Math.min(1, (d - s0) / L)); });
+      if (t < T1) {
+        const sg = segs.find(([, , s0, L]) => d <= s0 + L) || segs[segs.length - 1];
+        const q = Math.min(1, (d - sg[2]) / sg[3]);
+        sx = sg[0][0] + (sg[1][0] - sg[0][0]) * q; sy = sg[0][1] + (sg[1][1] - sg[0][1]) * q;
+      }
+    }
+    if (t >= T1) {   // writing, fast, zig-zagging along the letters
+      const p = Math.min(1, (t - T1) / (T2 - T1)), wx = tx + p * (tw + 1);
+      drawText(t < T2 ? wx : 999);
+      if (t < T2) { sx = wx; sy = ty + 3 + 3 * Math.sin(t * 0.06); }
+    }
+    if (t >= T2) {   // dash to the bottom-left corner and sit
+      const p = Math.min(1, (t - T2) / (T3 - T2)), ex = x0 + 3, ey = y0 + h - 3;
+      sx = tx + tw + (ex - tx - tw) * p; sy = ty + 3 + (ey - ty - 3) * p;
+      sy = Math.min(sy, y0 + h - 3);
+      if (p >= 1) walk = false;
+    }
+    // the spider: purple body, 8 wiggling legs, eyes that glow green at the end
+    const ph = walk ? Math.floor(t / 55) % 2 : 0, B = '#a040ff', LEG = '#6a20c0';
+    sx = Math.round(sx); sy = Math.round(sy);
+    for (let k = 0; k < 4; k++) {
+      const ly = sy - 1 + k + ((k + ph) % 2 ? 0 : -1) * (walk ? 1 : 0);
+      set(sx - 2, ly, LEG); set(sx - 3, ly + (k < 2 ? -1 : 1), LEG);
+      set(sx + 2, ly, LEG); set(sx + 3, ly + (k < 2 ? -1 : 1), LEG);
+    }
+    [[-1, 0], [0, 0], [1, 0], [-1, 1], [0, 1], [1, 1], [0, 2], [-1, -1], [0, -1], [1, -1]].forEach(([dx, dy]) => set(sx + dx, sy + dy, B));
+    const proud = t >= T3, glow = proud ? 0.55 + 0.45 * Math.sin((t - T3) * 0.008) : 0;
+    const eye = proud ? shade('#40ff50', 0.5 + glow * 0.5) : '#ff3080';
+    set(sx - 1, sy - 1, eye); set(sx + 1, sy - 1, eye);
+    if (proud) {   // glow halo around each eye
+      [[-2, -1], [-1, -2], [0, -1], [2, -1], [1, -2]].forEach(([dx, dy]) => { if (dx !== 0) set(sx + dx, sy + dy, shade('#40ff50', 0.25 + glow * 0.35)); });
+      set(sx - 1, sy - 1, shade('#80ff90', 0.6 + glow * 0.4)); set(sx + 1, sy - 1, shade('#80ff90', 0.6 + glow * 0.4));
     }
   } else if (type === '~') {   // big rainbow wave
     for (let x = x0; x < x0 + w; x++) for (let k = 0; k < 2; k++) {
@@ -1308,7 +1393,7 @@ function send(cmd) {
 $('connect').onclick = connect;
 // ---------- turn everything into clips for the sign ----------
 const CLIP_FRAMES = 32, CLIP_MS = 50, SCENE_STEP = 40;
-const hasAnimCode = t => /\{[$~D*>]\}/.test(t);
+const hasAnimCode = t => /\{(.)\}/.test(t) && [...t.matchAll(/\{(.)\}/g)].some(m => ANIMW[m[1]]);
 function cycleCols(cols, H, W, scroll, gap, anim, now) {   // one repeat of a scrolling line, same math as the preview
   if (!scroll) return cols;
   if (gap === 'B') return [...cols, ...[...Array(W)].map(() => Array(H).fill(null))];
