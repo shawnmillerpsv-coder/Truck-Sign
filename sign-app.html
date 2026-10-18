@@ -31,7 +31,8 @@
   input[type=text], textarea {
     width:100%; background:#05070a; color:var(--fg); border:1px solid var(--edge); border-radius:8px; padding:10px; font-size:16px; }
   input[type=text]:focus { outline:none; border-color:var(--blue); box-shadow:0 0 0 2px var(--glow); }
-  input[type=range] { width:100%; accent-color:var(--blue); }
+  input[type=range] { width:100%; accent-color:var(--blue); touch-action:pan-y; height:28px; }
+  input[type=range]::-webkit-slider-thumb { width:26px; height:26px; }
   input[type=color] { width:100%; height:44px; border:1px solid var(--edge); border-radius:8px; background:#05070a; padding:2px; }
   button {
     background:linear-gradient(180deg, var(--blue), var(--blue2)); color:#fff; border:1px solid #3aa0ff;
@@ -76,15 +77,142 @@
   .anims { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-top:6px; }
   .anims button { margin-top:0; padding:10px 4px; font-size:13px; }
   .hint { font-size:12px; color:var(--mut); margin-top:6px; }
+  .hdr { display:flex; align-items:center; gap:12px; margin:0 0 12px; flex-wrap:wrap; }
+  .hdr h1 { margin:0; }
+  #appword { display:block; height:20px; }
+  .section { font-size:13px; letter-spacing:3px; text-transform:uppercase; color:var(--blue); text-shadow:0 0 8px var(--glow);
+             margin:22px 0 10px; display:flex; align-items:center; gap:10px; }
+  .section::after { content:''; flex:1; height:1px; background:linear-gradient(90deg, var(--blue), transparent); opacity:.6; }
+  /* thumbnail drop-downs */
+  .dd { position:relative; }
+  .ddbtn { display:flex; align-items:center; gap:10px; text-align:left; padding:8px 12px; }
+  .ddbtn .nm { flex:1; }
+  .ddbtn .car { color:var(--blue); font-size:14px; }
+  .th[hidden] { display:none; }
+  .th { background:#000; border-radius:4px; border:1px solid #1d2532; display:block; flex:none; }
+  .ddlist { position:absolute; left:0; right:0; top:calc(100% + 4px); z-index:20; background:#0c1016; border:1px solid var(--blue);
+            border-radius:10px; box-shadow:0 8px 30px rgba(0,0,0,.7), 0 0 14px var(--glow); padding:6px; max-height:360px; overflow:auto; }
+  .opt { display:flex; align-items:center; gap:10px; padding:8px; border-radius:8px; cursor:pointer; font-size:15px; }
+  .opt:hover, .opt.cur { background:#14202f; }
+  .opt.cur { outline:1px solid var(--blue); }
+  /* color letters */
+  .tabs { display:flex; gap:6px; }
+  #ctabs .ctog { margin-top:0; }
+  .chips { display:flex; flex-wrap:wrap; gap:3px; margin-top:10px; padding:8px; background:#05070a; border:1px solid var(--edge); border-radius:8px; }
+  .wd { display:inline-flex; gap:3px; flex-wrap:nowrap; }
+  .ch { min-width:20px; height:30px; display:flex; align-items:center; justify-content:center; border-radius:5px;
+        background:#11161e; border:1px solid #1f2733; font:700 16px ui-monospace,monospace; cursor:pointer; user-select:none; }
+  .ch.sp { min-width:12px; background:transparent; border-color:transparent; }
+  .ch.sel { border-color:var(--blue); box-shadow:0 0 8px var(--glow); background:#10243c; }
+  .ch.an { font-size:12px; padding:0 4px; color:var(--mut); cursor:default; }
+  /* big screen card */
+  .chk { display:flex; align-items:center; gap:10px; padding:10px; margin-top:10px; border:1px solid var(--blue); border-radius:10px;
+         background:#0a1422; color:var(--fg); font-size:15px; font-weight:600; cursor:pointer; }
+  .chk input { width:22px; height:22px; accent-color:var(--blue); }
+  .fbtns { display:grid; grid-template-columns:repeat(5,1fr); gap:5px; }
+  .fbtns button, .tog2 button { margin-top:0; padding:10px 2px; font-size:12px; }
+  .tog2 { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:8px; }
+  .pal { display:grid; grid-template-columns:repeat(9,minmax(0,1fr)); gap:6px; margin-top:8px; }
+  .sw { min-width:0; aspect-ratio:1; border-radius:6px; border:2px solid #1f2733; cursor:pointer; }
+  .sw.cur { border-color:#fff; box-shadow:0 0 8px var(--glow); }
+  .collapse { margin-top:10px; padding:10px; background:#070a0f; border:1px solid var(--edge); border-radius:10px; }
 </style>
 </head>
 <body>
-<h1>TruckSign</h1>
+<header class="hdr"><h1>TruckSign</h1><canvas id="appword" aria-label="Application"></canvas></header>
 
 <div class="card">
   <button id="connect">Connect to sign</button>
   <div id="status">Not connected</div>
 </div>
+
+<div class="card">
+  <h2>Preview</h2>
+  <div id="pvwrap"><canvas id="pv"></canvas></div>
+  <div class="row">
+    <button id="play">▶ Play preview</button>
+    <button class="sec" id="fs">⛶ Full screen</button>
+  </div>
+</div>
+
+<div class="card" id="bigCard">
+  <h2>Big screen</h2>
+  <label>Big scene graphic (whole sign)</label>
+  <div id="scenePick"></div>
+  <div class="row">
+    <button class="sec" id="showScene">▶ Show scene now</button>
+  </div>
+  <label>Play it every <b id="evl" style="color:var(--blue)">2</b> loops of the scrolling message</label>
+  <input type="range" id="every" min="1" max="5" value="2">
+
+  <label class="chk"><input type="checkbox" id="bigOn"> Lock in tall double-line text (Line 1 + Line 2 become one)</label>
+  <div id="bigBody" hidden>
+    <label>Tall text</label><input type="text" id="bigText">
+    <div class="row">
+      <button class="sec" id="bm0">Static</button>
+      <button class="sec" id="bm1">Scroll</button>
+    </div>
+    <div id="bigGapRow">
+      <label>Gap between repeats: <b id="bigGl" style="color:var(--blue)"></b></label>
+      <input type="range" id="bigGap" min="0" max="4" step="1">
+      <div class="ticks"><span>Blank</span><span>3</span><span>2</span><span>1</span><span>None</span></div>
+      <label>Gap animation</label><div id="bigGapPick"></div>
+    </div>
+    <label>Add an animation between words</label><div id="bigInsPick"></div>
+    <label>Scroll speed: <span id="bigSv"></span></label>
+    <input type="range" id="bigSpeed" min="1" max="20">
+    <div class="ticks"><span>Slow</span><span>Old max</span><span>2× fast</span></div>
+
+    <button class="sec" id="fontTog" style="margin-top:14px">🎨 Font &amp; color ▾</button>
+    <div id="fontBox" class="collapse" hidden>
+      <label style="margin-top:0">Font</label>
+      <div class="fbtns" id="bigFonts"></div>
+      <label>Size: <b id="bigSzl" style="color:var(--blue)"></b></label>
+      <input type="range" id="bigSize" min="0" max="2" step="1">
+      <div class="ticks"><span>Small</span><span>Medium</span><span>Full height</span></div>
+      <div class="tog2">
+        <button class="sec" id="bigB"><b>B</b> Bold</button>
+        <button class="sec" id="bigI"><i>I</i> Italic</button>
+      </div>
+      <label>Text color (tap letters below first to color just those)</label>
+      <div class="pal" id="bigPal"></div>
+      <button class="sec" id="tileTog">Color single letters ▾</button>
+      <div id="tileBox" hidden>
+        <div class="chips" id="bigChips"></div>
+        <div class="hint">Tap the first letter, then the last letter, then tap a color above. Tap one letter twice for just that letter.</div>
+        <button class="sec" id="bigClr">Remove letter colors</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="gauge">
+    <svg viewBox="0 0 150 96">
+      <path d="M15 85 A60 60 0 0 1 135 85" fill="none" stroke="#1a2230" stroke-width="10" stroke-linecap="round"/>
+      <path id="garc" d="M15 85 A60 60 0 0 1 135 85" fill="none" stroke="#1e8fff" stroke-width="10" stroke-linecap="round"
+            style="filter:drop-shadow(0 0 6px rgba(30,143,255,.8))" pathLength="100" stroke-dasharray="60 100"/>
+      <text x="75" y="72" text-anchor="middle" class="val" id="gval">60</text>
+      <text x="75" y="90" text-anchor="middle" class="lbl">BRIGHTNESS %</text>
+    </svg>
+  </div>
+  <input type="range" id="bright" min="5" max="100" value="60">
+</div>
+
+<div id="lines"></div>
+
+<div class="card" id="colorCard">
+  <h2>Color single letters</h2>
+  <div id="ctabs" style="display:grid; gap:8px"></div>
+  <div class="hint" id="chint">Open a line, tap the first letter, then the last letter. Tap one letter twice for just that letter.</div>
+  <div class="row" style="margin-top:8px">
+    <input type="color" id="accent" value="#ff0000" style="flex:0 0 64px">
+    <button id="applyC" style="margin-top:0">Apply color</button>
+    <button class="sec" id="clearC" style="margin-top:0">Remove color</button>
+  </div>
+</div>
+
+<div class="section">Settings</div>
 
 <div class="card">
   <h2>Presets</h2>
@@ -105,58 +233,10 @@
 </div>
 
 <div class="card">
-  <h2>Preview</h2>
-  <div id="pvwrap"><canvas id="pv"></canvas></div>
-  <div class="row">
-    <button id="play">▶ Play preview</button>
-    <button class="sec" id="fs">⛶ Full screen</button>
-  </div>
-  <div class="hint">Preview font is close to the sign's but not pixel-exact. Phone numbers are exact.</div>
-</div>
-
-<div class="card">
-  <h2>Big scene (whole sign)</h2>
-  <div class="anims" id="scenes"></div>
-  <label>Play it every <b id="evl" style="color:var(--blue)">2</b> loops of the scrolling message</label>
-  <input type="range" id="every" min="1" max="5" value="2">
-  <div class="hint">When the message wraps around, everything pauses and the scene plays across all panels for about 4½ seconds.</div>
-</div>
-
-<div id="lines"></div>
-
-<div class="card">
-  <h2>Animations between words</h2>
-  <div class="anims" id="inlineAnims"></div>
-  <div class="hint">Tap in a line's text where it should go, then pick one. Example: WHOLESALE {$} LOWEST PRICES</div>
-</div>
-
-<div class="card">
-  <h2>Color single letters</h2>
-  <div class="row">
-    <input type="color" id="accent" value="#ff0000">
-    <button class="sec" id="insert" style="margin-top:0">Insert color</button>
-    <button class="sec" id="endc" style="margin-top:0">End color</button>
-  </div>
-  <div class="hint">Tap in a line's text where the color should start, then Insert. Example: HALF PRICE{FF0000}!{}</div>
-</div>
-
-<div class="card">
-  <div class="gauge">
-    <svg viewBox="0 0 150 96">
-      <path d="M15 85 A60 60 0 0 1 135 85" fill="none" stroke="#1a2230" stroke-width="10" stroke-linecap="round"/>
-      <path id="garc" d="M15 85 A60 60 0 0 1 135 85" fill="none" stroke="#1e8fff" stroke-width="10" stroke-linecap="round"
-            style="filter:drop-shadow(0 0 6px rgba(30,143,255,.8))" pathLength="100" stroke-dasharray="60 100"/>
-      <text x="75" y="72" text-anchor="middle" class="val" id="gval">60</text>
-      <text x="75" y="90" text-anchor="middle" class="lbl">BRIGHTNESS %</text>
-    </svg>
-  </div>
-  <input type="range" id="bright" min="5" max="100" value="60">
-</div>
-
-<div class="card">
   <button id="send">Send to sign</button>
   <button class="sec" id="test">Wiring test pattern</button>
   <button class="sec" id="get">Read settings from sign</button>
+  <div id="prog" hidden style="margin-top:10px;height:10px;border-radius:5px;background:#05070a;border:1px solid var(--edge);overflow:hidden"><div id="progbar" style="height:100%;width:0;background:linear-gradient(90deg,var(--blue2),var(--blue));box-shadow:0 0 8px var(--glow)"></div></div>
   <div id="log"></div>
 </div>
 
@@ -165,23 +245,40 @@
 const COLS = 6, ROWS = 3, PW = 32, PH = 8, MAXP = 8;
 const AD = 'WHOLESALE CABINETS {$} TOP QUALITY {$} HALF THE PRICE {$} KITCHENS & BATHS';
 const PHONE = '555-123-4567';
-const L = (scroll, text, color = '#ffffff', speed = 5, gap = '1', anim = '$') => ({ scroll, speed, color, text, gap, anim });
+const L = (scroll, text, color = '#ffffff', speed = 5, gap = '1', anim = '$', font = 'classic') => ({ scroll, speed, color, text, gap, anim, font });
 const BUILTIN = [
-  { name:'4-2 Scrolling ad', layout:[[0,0],[1,0],[2,0],[3,0],[1,1],[2,1]], lines:[L(true, AD, '#ffa000'), L(false, PHONE), L(false, '')], bright:60 },
-  { name:'4-2 Steady (driving)', layout:[[0,0],[1,0],[2,0],[3,0],[1,1],[2,1]], lines:[L(false, 'WHOLESALE CABINETS', '#ffa000'), L(false, PHONE), L(false, '')], bright:60 },
   { name:'3-3 Scrolling ad', layout:[[0,0],[1,0],[2,0],[0,1],[1,1],[2,1]], lines:[L(true, AD, '#ffa000'), L(false, PHONE), L(false, '')], bright:60 },
   { name:'3-3 Steady (driving)', layout:[[0,0],[1,0],[2,0],[0,1],[1,1],[2,1]], lines:[L(false, 'HALF PRICE CABINETS', '#ffa000'), L(false, PHONE), L(false, '')], bright:60 },
+  { name:'3-3 Tall scrolling ad', layout:[[0,0],[1,0],[2,0],[0,1],[1,1],[2,1]], lines:[L(true, AD, '#ffa000'), L(false, PHONE), L(false, '')], bright:60,
+    big:{ on:true, text:'WHOLESALE {FFFFFF}CABINETS{} {$} HALF PRICE' } },
+  { name:'4-2 Scrolling ad', layout:[[0,0],[1,0],[2,0],[3,0],[1,1],[2,1]], lines:[L(true, AD, '#ffa000'), L(false, PHONE), L(false, '')], bright:60 },
+  { name:'4-2 Steady (driving)', layout:[[0,0],[1,0],[2,0],[3,0],[1,1],[2,1]], lines:[L(false, 'WHOLESALE CABINETS', '#ffa000'), L(false, PHONE), L(false, '')], bright:60 },
+  { name:'4-2 Tall scrolling ad', layout:[[0,0],[1,0],[2,0],[3,0],[1,1],[2,1]], lines:[L(true, AD, '#ffa000'), L(false, PHONE), L(false, '')], bright:60,
+    big:{ on:true, text:'WHOLESALE {FFFFFF}CABINETS{} {$} HALF PRICE' } },
 ];
 const ANIMS = [ ['-', 'None'], ['$', '$ Dollars'], ['~', '〰 Wave'], ['D', '🐬 Dolphin'], ['*', '✦ Sparkle'], ['>', '» Arrows'] ];
 const GAPS = ['B', '3', '2', '1', '0'];   // slider left -> right
 const GAPNAME = { B:'Blank (scrolls fully off)', 3:'3 panels', 2:'2 panels', 1:'1 panel', 0:'No gap' };
-function fixState(st) { if (!st.scene) st.scene = { type:'D', every:2 }; st.lines.forEach(fixLine); return st; }
+const stepMs = sp => sp <= 10 ? 90 - (sp - 1) * (75 / 9) : 150 / sp;   // ms per 1-dot move; 20 = twice the old top speed
+const BIGDEF = () => ({ on:false, text:'HALF PRICE {$} CABINETS', scroll:true, speed:5, gap:'1', anim:'$',
+                        color:'#ffa000', font:'classic', size:2, bold:true, italic:false });
+function fixState(st) {
+  if (!st.scene) st.scene = { type:'D', every:2 };
+  st.big = Object.assign(BIGDEF(), st.big || {});
+  if (st.big.font === 'digital') st.big.font = 'tall';
+  st.lines.forEach(fixLine);
+  st.lines.forEach(ln => { if (ln.font === 'tall') { ln.font = 'classic'; st.big.on = true; st.big.text = ln.text; } });
+  return st;
+}
+const getLn = r => r === 9 ? state.big : state.lines[r];
 function fixLine(ln) {   // upgrade presets saved by older versions
   if (ln.gap === 'W') ln.gap = '0';
   if (ln.gap === 'D' || ln.gap === undefined) { ln.gap = '1'; ln.anim = ln.anim || '$'; }
   if (ln.anim === undefined) ln.anim = '-';
+  if (ln.font === undefined) ln.font = isPhone(ln.text) ? 'digital' : 'classic';
   return ln;
 }
+BUILTIN.forEach(p => p.lines.forEach(ln => { if (isPhone(ln.text)) ln.font = 'digital'; }));
 let state = fixState(structuredClone(BUILTIN[0]));
 
 const $ = id => document.getElementById(id);
@@ -244,15 +341,23 @@ $('remP').onclick = () => { if (state.layout.length > 1) { state.layout.pop(); r
 
 // ---------- line editors ----------
 let lastBox = null;
+const colorCardEl = document.getElementById('colorCard');
 function renderLines() {
-  const box = $('lines'); box.innerHTML = '';
+  const box = $('lines'); colorCardEl.remove(); box.innerHTML = '';
+  if (state.big.on) {
+    const n = document.createElement('div'); n.className = 'card';
+    n.innerHTML = '<h2 style="margin:0 0 6px">Lines 1 + 2</h2><div class="hint" style="margin:0">Locked into tall double-line text. Edit it in the Big screen card. Uncheck the box there to get Line 1 and Line 2 back (their settings are kept).</div>';
+    box.appendChild(n);
+  }
   rowsUsed().forEach(r => {
+    if (state.big.on && r < 2) return;
     const ln = state.lines[r];
     const nums = state.layout.map((p, i) => p[1] === r ? i + 1 : null).filter(Boolean).join(', ');
     const c = document.createElement('div'); c.className = 'card line-card';
     c.innerHTML = `
       <div class="head"><h2 style="margin:0">Line ${r + 1}</h2><span class="chip">Panels ${nums}</span></div>
       <label>Text</label><input type="text" class="t" value="">
+      <label>Font</label><div class="fontPick"></div>
       <div class="row">
         <button class="sec m0 ${ln.scroll ? '' : 'on'}">Static</button>
         <button class="sec m1 ${ln.scroll ? 'on' : ''}">Scroll</button>
@@ -262,22 +367,43 @@ function renderLines() {
         <input type="range" class="gs" min="0" max="4" step="1" value="${GAPS.indexOf(ln.gap)}">
         <div class="ticks"><span>Blank</span><span>3</span><span>2</span><span>1</span><span>None</span></div>
         <label>Gap animation</label>
-        <div class="anims">${ANIMS.map(([k, n]) => `<button class="sec ga ${ln.anim === k ? 'on' : ''}" data-a="${k}">${n}</button>`).join('')}</div>
+        <div class="gapPick"></div>
       </div>
+      <label>Add an animation between words</label>
+      <div class="insPick"></div>
       <label>Color</label><input type="color" class="c" value="${ln.color}">
       <label>Scroll speed: <span class="sv">${ln.speed}</span></label>
-      <input type="range" class="s" min="1" max="10" value="${ln.speed}">`;
+      <input type="range" class="s" min="1" max="20" value="${ln.speed}">
+      <div class="ticks"><span>Slow</span><span>Old max</span><span>2× fast</span></div>`;
     const t = c.querySelector('.t'); t.value = ln.text;
     t.oninput = () => { ln.text = t.value; drawPreview(); };
+    const keep = () => { ln._caret = t.selectionStart; };
     t.onfocus = () => lastBox = { el:t, ln };
+    t.onkeyup = t.onclick = t.onselect = t.onblur = keep;
+    t.addEventListener('input', () => { keep(); if (colorRow === r) renderChips(); });
     c.querySelector('.m0').onclick = () => { ln.scroll = false; renderLines(); drawPreview(); };
     c.querySelector('.m1').onclick = () => { ln.scroll = true; renderLines(); drawPreview(); };
     c.querySelector('.gs').oninput = e => { ln.gap = GAPS[+e.target.value]; c.querySelector('.gl').textContent = GAPNAME[ln.gap]; resetSim(); drawPreview(); };
-    c.querySelectorAll('.ga').forEach(b => b.onclick = () => { ln.anim = b.dataset.a; resetSim(); renderLines(); drawPreview(); });
+    c.querySelector('.fontPick').appendChild(makePicker({
+      options: FONTS, value: ln.font, thumb: fontThumb,
+      onPick: k => { ln.font = k; resetSim(); renderLines(); drawPreview(); } }));
+    c.querySelector('.gapPick').appendChild(makePicker({
+      options: ANIMS, value: ln.anim, thumb: animThumb,
+      onPick: k => { ln.anim = k; resetSim(); drawPreview(); } }));
+    c.querySelector('.insPick').appendChild(makePicker({
+      options: ANIMS.slice(1), value: null, thumb: animThumb, label: '+ Pick an animation to insert',
+      onPick: k => {
+        const p = Math.min(ln._caret ?? ln.text.length, ln.text.length);
+        ln.text = ln.text.slice(0, p) + ' {' + k + '} ' + ln.text.slice(p);
+        ln._caret = p + 5; t.value = ln.text; if (colorRow === r) renderChips(); drawPreview();
+      } }));
     c.querySelector('.c').oninput = e => { ln.color = e.target.value; drawPreview(); };
     c.querySelector('.s').oninput = e => { ln.speed = +e.target.value; c.querySelector('.sv').textContent = ln.speed; };
     box.appendChild(c);
   });
+  const first = box.firstElementChild;
+  if (first) first.after(colorCardEl); else box.appendChild(colorCardEl);
+  renderColorCard();
 }
 function insertAt(txt) {
   if (!lastBox) { alert('Tap in a line\'s text first'); return; }
@@ -287,9 +413,97 @@ function insertAt(txt) {
   b.focus(); b.selectionStart = b.selectionEnd = p + txt.length;
   drawPreview();
 }
-$('insert').onpointerdown = $('endc').onpointerdown = e => e.preventDefault();
-$('insert').onclick = () => insertAt('{' + hex($('accent').value) + '}');
-$('endc').onclick = () => insertAt('{}');
+
+// ---------- color single letters (tap letters, no cursor needed) ----------
+let colorRow = null, selA = null, selB = null;
+const colorOpen = new Set();
+function tokenize(text) {
+  const out = []; let color = null;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '{') {
+      const e = text.indexOf('}', i);
+      if (e > 0) {
+        const c = text.slice(i + 1, e);
+        if (c.length === 1 && ANIMW[c]) out.push({ anim:c });
+        else if (c.length === 6) color = c.toUpperCase();
+        else if (c.length === 0) color = null;
+        i = e; continue;
+      }
+    }
+    out.push({ ch:text[i], color });
+  }
+  return out;
+}
+function untokenize(toks) {
+  let out = '', cur = null;
+  toks.forEach(t => {
+    if (t.anim) { out += '{' + t.anim + '}'; return; }
+    if (t.color !== cur) { out += t.color ? '{' + t.color + '}' : '{}'; cur = t.color; }
+    out += t.ch;
+  });
+  if (cur) out += '{}';
+  return out;
+}
+function selRange() {
+  if (selA === null) return null;
+  const b = selB === null ? selA : selB;
+  return [Math.min(selA, b), Math.max(selA, b)];
+}
+function chipsHtml(r) {
+  const ln = getLn(r);
+  if (!ln.text) return '<span class="hint" style="margin:0">Type a message in this line first.</span>';
+  const toks = tokenize(ln.text), rg = colorRow === r ? selRange() : null;
+  const parts = toks.map((t, i) => {
+    if (t.anim) return `<span class="ch an">${(ANIMS.find(a => a[0] === t.anim) || ['', t.anim])[1]}</span>`;
+    const sel = rg && i >= rg[0] && i <= rg[1] ? ' sel' : '';
+    if (t.ch === ' ') return `<span class="ch sp${sel}" data-r="${r}" data-i="${i}"></span>`;
+    const col = t.color ? '#' + t.color : ln.color;
+    return `<span class="ch${sel}" data-r="${r}" data-i="${i}" style="color:${col}">${t.ch.replace(/[<&]/g, m => m === '<' ? '&lt;' : '&amp;')}</span>`;
+  });
+  let html = '', word = '';
+  toks.forEach((t, i) => {
+    if (t.anim || t.ch === ' ') { if (word) html += '<span class="wd">' + word + '</span>'; word = ''; html += parts[i]; }
+    else word += parts[i];
+  });
+  if (word) html += '<span class="wd">' + word + '</span>';
+  return html;
+}
+function renderColorCard() {
+  renderBigChips();
+  const rows = rowsUsed().filter(r => !(state.big.on && r < 2));
+  colorCardEl.hidden = !rows.length;
+  [...colorOpen].forEach(r => { if (!rows.includes(r)) colorOpen.delete(r); });
+  if (colorRow !== null && colorRow !== 9 && !rows.includes(colorRow)) { colorRow = null; selA = selB = null; }
+  $('ctabs').innerHTML = rows.map(r => {
+    const open = colorOpen.has(r);
+    return `<button class="sec ctog ${open ? 'on' : ''}" data-r="${r}">Line ${r + 1} ${open ? '▴' : '▾'}</button>` +
+           (open ? `<div class="chips">${chipsHtml(r)}</div>` : '');
+  }).join('');
+  $('ctabs').querySelectorAll('.ctog').forEach(b => b.onclick = () => {
+    const r = +b.dataset.r;
+    if (colorOpen.has(r)) { colorOpen.delete(r); if (colorRow === r) { colorRow = null; selA = selB = null; } }
+    else colorOpen.add(r);
+    renderColorCard();
+  });
+  $('ctabs').querySelectorAll('[data-i]').forEach(el => el.onclick = () => {
+    const r = +el.dataset.r, i = +el.dataset.i;
+    if (colorRow !== r) { colorRow = r; selA = i; selB = null; }
+    else if (selA === null || selB !== null) { selA = i; selB = null; } else selB = i;
+    renderColorCard();
+  });
+}
+function renderChips() { renderColorCard(); }
+function paint(color) {
+  const rg = selRange(); if (colorRow === null || !rg) return;
+  const ln = getLn(colorRow), toks = tokenize(ln.text);
+  for (let i = rg[0]; i <= rg[1]; i++) if (!toks[i].anim) toks[i].color = color;
+  ln.text = untokenize(toks);
+  selA = selB = null;
+  if (colorRow === 9) $('bigText').value = ln.text;
+  renderLines(); drawPreview();
+}
+$('applyC').onclick = () => paint(hex($('accent').value));
+$('clearC').onclick = () => paint(null);
 
 // ---------- brightness gauge ----------
 function setGauge(v) { $('gval').textContent = v; $('garc').setAttribute('stroke-dasharray', v + ' 100'); }
@@ -301,6 +515,55 @@ const DIG = [[6,9,9,9,9,9,6],[2,6,2,2,2,2,7],[6,9,1,2,4,8,15],[14,1,1,6,1,1,14],
 const glyphCache = {};
 const gc = document.createElement('canvas'); gc.width = 50; gc.height = 70;
 const gctx = gc.getContext('2d', { willReadFrequently:true });
+const fontCache = {};
+function sampleGlyph(ch, cols, rows) {   // render a letter big, then sample it down to a cols x rows dot grid
+  const key = ch + cols + 'x' + rows;
+  if (fontCache[key]) return fontCache[key];
+  gctx.clearRect(0, 0, 50, 70);
+  gctx.fillStyle = '#fff'; gctx.font = 'bold 70px monospace'; gctx.textBaseline = 'alphabetic'; gctx.textAlign = 'center';
+  gctx.save(); gctx.scale(1.15, 1); gctx.fillText(ch, 25 / 1.15, 62); gctx.restore();
+  const d = gctx.getImageData(0, 0, 50, 70).data, out = [], cw = 50 / cols, rh = 70 / rows;
+  for (let cx = 0; cx < cols; cx++) {
+    const col = [];
+    for (let cy = 0; cy < rows; cy++) {
+      let sum = 0, n = 0;
+      for (let x = Math.floor(cx * cw); x < Math.floor((cx + 1) * cw); x++)
+        for (let y = Math.floor(cy * rh); y < Math.floor((cy + 1) * rh); y++) { sum += d[(y * 50 + x) * 4 + 3]; n++; }
+      col.push(sum / n > 95);
+    }
+    out.push(col);
+  }
+  return fontCache[key] = out;
+}
+const FONTS = [ ['classic', 'Classic'], ['bold', 'Bold'], ['narrow', 'Narrow (fits more)'], ['digital', 'Digital numbers'], ['italic', 'Italic'] ];
+const fontH = f => f === 'tall' ? 16 : 8;
+function fontGlyph(ch, font) {
+  const blank = h => Array(h).fill(false);
+  if (font === 'bold') {
+    const g = glyph(ch), out = [];
+    for (let x = 0; x < 6; x++) out.push(g[x].map((on, y) => on || (x > 0 && g[x - 1][y])));
+    out.push(blank(8));
+    return out;
+  }
+  if (font === 'italic') {   // slant the classic letters: top rows shift right
+    const g = glyph(ch), out = [...Array(g.length + 2)].map(() => Array(8).fill(false));
+    g.forEach((col, x) => col.forEach((on, y) => { if (on) out[x + Math.floor((6 - Math.min(6, y)) / 3)][y] = true; }));
+    return out;
+  }
+  if (font === 'narrow') { const g = sampleGlyph(ch, 4, 7).map(c => [...c, false]); g.push(blank(8)); return g; }
+  if (font === 'tall') { const g = sampleGlyph(ch, 9, 15).map(c => [...c, false]); g.push(blank(16), blank(16)); return g; }
+  if (font === 'digital') {
+    if (/\d/.test(ch)) {
+      const d = DIG[+ch], out = [];
+      for (let c = 0; c < 4; c++) out.push([...Array(8)].map((_, r) => r < 7 && !!(d[r] & (8 >> c))));
+      out.push(blank(8)); return out;
+    }
+    if (ch === '-') { const a = blank(8); a[3] = true; return [a, [...a], blank(8)]; }
+    if (ch === '.') { const a = blank(8); a[6] = true; return [a, blank(8)]; }
+    if (ch === ' ') return [blank(8), blank(8), blank(8)];
+  }
+  return glyph(ch);
+}
 function glyph(ch) {
   if (glyphCache[ch]) return glyphCache[ch];
   gctx.clearRect(0, 0, 50, 70);
@@ -356,83 +619,484 @@ function animCols(a, now) {   // -> columns of 8 colors|null, same math as the f
   }
   return g;
 }
-const SCENES = [ ['-', 'Off'], ['D', '🐬 Dolphin jump'], ['$', '$ Money rain'] ];
-const SCENE_MS = 4500;
+const SCENES = [ ['-', 'Off'], ['D', '🐬 Dolphin'], ['W', '🌊 Beach wave'], ['E', '👀 Purple eyes'], ['F', '🎆 Fireworks'], ['B', '💧 Bouncing drop'], ['R', '🌧 Rain'], ['$', '$ Money rain'], ['~', '〰 Rainbow wave'], ['*', '✦ Sparkles'], ['>', '« Arrows'] ];
+
+// ---------- animated thumbnails ----------
+const thumbs = new Set();
+function dots(cv, W, H, S, get) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  if (cv.width !== W * S * dpr) { cv.width = W * S * dpr; cv.height = H * S * dpr; cv.style.width = W * S + 'px'; cv.style.height = H * S + 'px'; }
+  const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.fillStyle = '#000'; c.fillRect(0, 0, W * S, H * S);
+  for (let x = 0; x < W; x++) for (let y = 0; y < H; y++) {
+    const col = get(x, y);
+    c.fillStyle = col || '#161a20';
+    c.beginPath(); c.arc(x * S + S / 2, y * S + S / 2, col ? S * 0.45 : S * 0.25, 0, 7); c.fill();
+  }
+}
+function animThumb(cv, k, now) {
+  if (k === '-') { dots(cv, 20, 8, 3, () => null); return; }
+  const cols = animCols(k, now);
+  dots(cv, Math.max(20, cols.length), 8, 3, (x, y) => cols[x] ? cols[x][y] : null);
+}
+function fontThumb(cv, k) {
+  const cols = raster(k === 'digital' ? '555-12' : 'Abc12', '#ffa000', 0, k), H = fontH(k);
+  dots(cv, Math.max(30, cols.length), H, H === 16 ? 1.6 : 3, (x, y) => cols[x] ? cols[x][y] : null);
+}
+function sceneThumb(cv, k, now) {
+  const fb = {};
+  if (k !== '-') drawScene(fb, now % sceneLen(k), k, 0, 0, 96, 16);
+  dots(cv, 96, 16, 1.8, (x, y) => fb[x + ',' + y]);
+}
+(function tick(t) {
+  thumbs.forEach(th => { if (!th.cv.isConnected) thumbs.delete(th); else th.draw(t); });
+  requestAnimationFrame(tick);
+})(0);
+function makePicker({ options, value, thumb, onPick, label }) {
+  const root = document.createElement('div'); root.className = 'dd';
+  const btn = document.createElement('button'); btn.className = 'sec ddbtn'; btn.type = 'button';
+  const cv = document.createElement('canvas'); cv.className = 'th';
+  const nm = document.createElement('span'); nm.className = 'nm';
+  const car = document.createElement('span'); car.className = 'car'; car.textContent = '▾';
+  btn.append(cv, nm, car);
+  const list = document.createElement('div'); list.className = 'ddlist'; list.hidden = true;
+  root.append(btn, list);
+  let cur = value;
+  const show = () => {
+    const o = options.find(o => o[0] === cur);
+    nm.textContent = label && !o ? label : (o ? o[1] : label || '');
+    cv.hidden = !o;
+  };
+  thumbs.add({ cv, draw: t => { if (!cv.hidden) thumb(cv, cur, t); } });
+  btn.onpointerdown = e => e.preventDefault();
+  btn.onclick = () => {
+    const open = list.hidden;
+    document.querySelectorAll('.ddlist').forEach(l => l.hidden = true);
+    if (!open) return;
+    list.innerHTML = '';
+    options.forEach(([k, n]) => {
+      const row = document.createElement('div'); row.className = 'opt' + (k === cur ? ' cur' : '');
+      const c2 = document.createElement('canvas'); c2.className = 'th';
+      const s2 = document.createElement('span'); s2.textContent = n;
+      row.append(c2, s2);
+      thumbs.add({ cv:c2, draw: t => thumb(c2, k, t) });
+      row.onpointerdown = e => e.preventDefault();
+      row.onclick = () => { list.hidden = true; if (!label) cur = k; show(); onPick(k); };
+      list.appendChild(row);
+    });
+    list.hidden = false;
+  };
+  show();
+  return root;
+}
+document.addEventListener('click', e => { if (!e.target.closest('.dd')) document.querySelectorAll('.ddlist').forEach(l => l.hidden = true); });
 let loopCount = 0, sceneStart = 0;
 function onWrap(r, now) {
   if (state.scene.type === '-') return;
+  if (state.big.on && state.big.scroll && state.big.text && r !== -1) return;   // tall text drives the scene timer
   if (rowsUsed().some(i => i < r && state.lines[i].scroll && state.lines[i].text)) return;
   if (++loopCount % state.scene.every === 0) sceneStart = now;
 }
-function drawScene(fb, t) {
+function sceneBox() {
   const gxs = state.layout.map(p => p[0]), gys = state.layout.map(p => p[1]);
   const x0 = Math.min(...gxs) * PW, y0 = Math.min(...gys) * PH;
-  const w = (Math.max(...gxs) + 1) * PW - x0, h = (Math.max(...gys) + 1) * PH - y0, ph = t / SCENE_MS;
-  const set = (x, y, c) => { fb[x + ',' + y] = c; };
-  if (state.scene.type === 'D') {
-    const dx = x0 - 20 + Math.floor(ph * (w + 20)), top = y0 + h - 4 - Math.round((h - 6) * Math.sin(ph * Math.PI));
-    for (let r = 0; r < 5; r++) for (let c = 0; c < 10; c++) if (DOLPHIN[r] & (1 << (9 - c)))
-      for (let k = 0; k < 4; k++) set(dx + c * 2 + (k & 1), top + r * 2 + (k >> 1), '#aac8eb');
+  return [x0, y0, (Math.max(...gxs) + 1) * PW - x0, (Math.max(...gys) + 1) * PH - y0];
+}
+const SCENE_LEN = { D:6500, '$':4500, R:5000, E:7500, F:6500, B:6500, W:11000, '~':4500, '*':4500, '>':4500 };
+const sceneLen = k => SCENE_LEN[k] || 4500;
+const hsh = n => { n = (n ^ 61) ^ (n >>> 16); n = Math.imul(n, 9); n ^= n >>> 4; n = Math.imul(n, 0x27d4eb2d); return (n ^ (n >>> 15)) >>> 0; };
+function shade(hexc, f) {
+  f = Math.max(0, Math.min(1, f));
+  const v = parseInt(hexc.slice(1), 16);
+  return '#' + [16, 8, 0].map(sh => Math.round(((v >> sh) & 255) * f).toString(16).padStart(2, '0')).join('');
+}
+const HUEC = h => hsvToHex(((h % 256) + 256) % 256);
+const sc = document.createElement('canvas'), sctx = sc.getContext('2d', { willReadFrequently:true });
+function dolphinShape(c) {   // facing left, centered on its body, ~36 dots long
+  c.fillStyle = '#6f98c4';
+  c.beginPath(); c.moveTo(-17, 0.3);
+  c.quadraticCurveTo(-14.5, -1.4, -12, -2.2);
+  c.quadraticCurveTo(-10, -5, -4, -5.4);
+  c.quadraticCurveTo(6, -5, 13, -1.6);
+  c.lineTo(15, -0.6); c.lineTo(15, 0.9);
+  c.quadraticCurveTo(4, 4.6, -7, 3.6);
+  c.quadraticCurveTo(-12, 2.6, -17, 1.4); c.closePath(); c.fill();
+  c.beginPath(); c.moveTo(-3, -5); c.quadraticCurveTo(0, -10.5, 4.5, -11); c.quadraticCurveTo(3, -7.5, 4.5, -4.6); c.closePath(); c.fill();
+  c.beginPath(); c.moveTo(14, 0); c.lineTo(20, -4.5); c.lineTo(18.6, 0.2); c.lineTo(20, 4.8); c.closePath(); c.fill();
+  c.beginPath(); c.moveTo(-6, 2.5); c.lineTo(-2, 6.5); c.lineTo(-1, 2.8); c.closePath(); c.fill();
+  c.fillStyle = '#cfe2f4';
+  c.beginPath(); c.moveTo(-16, 1); c.quadraticCurveTo(-4, 4.4, 9, 1.8); c.quadraticCurveTo(-4, 1.6, -16, 1); c.fill();
+  c.fillStyle = '#05080c'; c.fillRect(-12.5, -2.2, 1.2, 1.2);
+}
+function drawScene(fb, t, type, x0, y0, w, h, occ) {
+  occ = occ || ((x, y) => x >= x0 && x < x0 + w && y >= y0 && y < y0 + h);
+  const L = sceneLen(type), ph = t / L, cy = y0 + h / 2;
+  const set = (x, y, c) => { fb[Math.floor(x) + ',' + Math.floor(y)] = c; };
+  const water = (wt) => {
     for (let x = x0; x < x0 + w; x++) {
-      const surf = y0 + h - 3 + Math.round(Math.sin(x * 0.3 - t * 0.006));
-      for (let y = surf; y < y0 + h; y++) set(x, y, y === surf ? '#00b4ff' : '#0028a0');
-      const under = (ph < 0.18 || ph > 0.82) && x >= dx && x < dx + 20;
-      if (under && (x * 7 + Math.floor(t / 60)) % 3 === 0) set(x, surf - 1 - (x + Math.floor(t / 80)) % 3, '#ffffff');
+      const surf = y0 + h - 3 + Math.round(Math.sin(x * 0.28 + wt * 0.005));
+      for (let y = surf; y < y0 + h; y++) set(x, y, y === surf ? '#00b4ff' : '#0030a8');
     }
-  } else if (state.scene.type === '$') {
-    const d = glyph('$');
+  };
+  if (type === 'D') {   // porpoising dolphin, right to left: nose, back and fin roll out of the water and back in
+    sc.width = w; sc.height = h; sctx.clearRect(0, 0, w, h);
+    const jumps = 2, q = (ph * jumps) % 1, surf = h - 3;
+    const cx = w + 26 - ph * (w + 52);
+    const cyD = surf + 6 - 11 * Math.sin(Math.PI * q);
+    const ang = 0.55 * Math.cos(Math.PI * q);   // nose up while rising, nose down while diving
+    sctx.save(); sctx.translate(cx, cyD); sctx.rotate(ang); dolphinShape(sctx); sctx.restore();
+    const d = sctx.getImageData(0, 0, w, h).data;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (d[i + 3] > 110) set(x0 + x, y0 + y, '#' + [d[i], d[i + 1], d[i + 2]].map(v => v.toString(16).padStart(2, '0')).join(''));
+    }
+    water(t);
+    const cross = q < 0.22 || q > 0.78, nx = cx + (q < 0.5 ? -14 : 12);
+    if (cross) for (let k = 0; k < 7; k++) {
+      const sx = nx + (hsh(k * 31 + Math.floor(t / 70)) % 9) - 4, sy = y0 + h - 4 - (hsh(k * 17 + Math.floor(t / 90)) % 4);
+      set(x0 + sx, sy, k % 2 ? '#ffffff' : '#a8e8ff');
+    }
+  } else if (type === '$') {
+    const g = glyph('$');
     for (let i = 0; i * 7 < w; i++) {
-      const hsh = Number((BigInt(i) * 2654435761n % 4294967296n) >> 16n);
-      const v = 0.008 + (hsh % 5) * 0.003, fall = h + 8;
-      const y = Math.floor(t * v + (hsh % fall)) % fall - 8;
+      const hs = hsh(i + 7), v = 0.008 + (hs % 5) * 0.003, fall = h + 8;
+      const y = Math.floor(t * v + (hs % fall)) % fall - 8;
       const col = (i + Math.floor(t / 200)) % 2 ? '#00e05a' : '#ffd000';
-      d.forEach((cl, cx) => cl.forEach((on, cy) => { if (on) set(x0 + i * 7 + cx, y0 + y + cy, col); }));
+      g.forEach((cl, cx2) => cl.forEach((on, cy2) => { if (on) set(x0 + i * 7 + cx2, y0 + y + cy2, col); }));
+    }
+  } else if (type === 'R') {   // rain with little splashes on the bottom edge
+    for (let i = 0; i < w; i += 2) {
+      const hs = hsh(i * 13 + 5); if (hs % 3 === 0) continue;
+      const v = 0.018 + (hs % 4) * 0.004, fall = h + 6, off = hs % 97;
+      const yy = (t * v + off) % fall - 3;
+      for (let k = 0; k < 3; k++) set(x0 + i, y0 + yy - k, shade('#7fc8ff', 1 - k * 0.35));
+      if (yy > h - 1.5 && yy < h + 1) { set(x0 + i - 1, y0 + h - 2, '#cfefff'); set(x0 + i + 1, y0 + h - 2, '#cfefff'); }
+    }
+    for (let x = x0; x < x0 + w; x++) set(x, y0 + h - 1, (x + Math.floor(t / 150)) % 5 ? '#08306a' : '#1a5ab0');
+  } else if (type === 'E') {   // two purple eyes: look around, hard blink, then stare at the car behind
+    const ms = t, rx = Math.min(16, w / 6), ry = h / 2, ecy = y0 + h / 2 - 0.5;
+    const ease = p => p < 0 ? 0 : p > 1 ? 1 : p * p * (3 - 2 * p);
+    let look = 0;
+    if (ms < 800) look = 0; else if (ms < 1600) look = -ease((ms - 800) / 800); else if (ms < 2600) look = -1;
+    else if (ms < 3600) look = -1 + 2 * ease((ms - 2600) / 1000); else if (ms < 4300) look = 1; else if (ms < 4600) look = 1 - ease((ms - 4300) / 300);
+    const tri = (c, r) => Math.max(0, 1 - Math.abs(ms - c) / r);
+    let lid = 0.22;
+    lid = Math.max(lid, tri(2100, 140));               // quick blink
+    if (ms > 4600 && ms < 5250) lid = ms < 4720 ? (ms - 4600) / 120 : ms < 5050 ? 1 : 1 - (ms - 5050) / 200;  // hard blink
+    const stare = ms > 5150;
+    if (stare) lid = Math.min(lid, 0);
+    const irisR = stare ? 5.2 : 4.4, pupR = stare ? 2.8 : 1.8;
+    [x0 + w / 2 - rx * 1.35, x0 + w / 2 + rx * 1.35].forEach(ecx => {
+      for (let x = Math.floor(ecx - rx); x <= ecx + rx; x++) for (let y = y0; y < y0 + h; y++) {
+        const nx = (x + 0.5 - ecx) / rx, ny = (y + 0.5 - ecy - 0.5) / ry, e = nx * nx + ny * ny;
+        if (e > 1) continue;
+        const lidEdge = y0 + lid * h;
+        if (y < lidEdge - 0.5) { set(x, y, '#7a2cc0'); continue; }
+        if (y < lidEdge + 0.5 && lid > 0.02) { set(x, y, '#2a0650'); continue; }
+        if (e > 0.82) { set(x, y, '#5a1890'); continue; }
+        const icx = ecx + look * rx * 0.5, icy = ecy + (stare ? 0 : 0.6);
+        const d = Math.hypot(x + 0.5 - icx, y + 0.5 - icy);
+        if (d < pupR) set(x, y, Math.abs(x + 0.5 - (icx - 1)) < 0.6 && Math.abs(y + 0.5 - (icy - 1)) < 0.6 ? '#ffffff' : '#140020');
+        else if (d < irisR) set(x, y, d > irisR - 1.1 ? '#6a10c0' : '#b050ff');
+        else set(x, y, '#e6dcf5');
+      }
+    });
+  } else if (type === 'F') {   // fireworks
+    for (let k = 0; k < 7; k++) {
+      const t0 = k * 820, dt = t - t0; if (dt < 0) continue;
+      const hs = hsh(k * 101 + 3), bx = x0 + 10 + hs % Math.max(1, w - 20), peak = y0 + 2 + (hs >> 5) % 4, base = y0 + h - 1;
+      const col = HUEC((hs >> 9) % 256), rise = 550;
+      if (dt < rise) {
+        const yy = base - (base - peak) * (dt / rise);
+        set(bx, yy, '#ffd27a'); set(bx, yy + 1, '#a06000');
+      } else {
+        const e = dt - rise; if (e > 1500) continue;
+        const f = 1 - e / 1500, n = 16;
+        for (let i = 0; i < n; i++) {
+          const a = i / n * Math.PI * 2, sp = 0.016 * (0.75 + ((hs >> i) & 3) * 0.12);
+          const px2 = bx + Math.cos(a) * sp * e, py = peak + Math.sin(a) * sp * e * 0.75 + 0.000006 * e * e;
+          set(px2, py, (e > 900 && (i + Math.floor(e / 90)) % 3 === 0) ? shade('#ffffff', f) : shade(col, f + 0.15));
+        }
+        if (e < 120) set(bx, peak, '#ffffff');
+      }
+    }
+  } else if (type === 'B') {   // water droplet bouncing off the real edges of the panel layout, with splashes
+    const step = 18, n = Math.floor(t / step), splashes = [];
+    let x = x0 + w - 4, y = y0 + 1, vx = -1.15, vy = 0;
+    const free = (px2, py) => occ(Math.floor(px2), Math.floor(py)) && occ(Math.floor(px2) + 1, Math.floor(py)) && occ(Math.floor(px2), Math.floor(py) + 1) && occ(Math.floor(px2) + 1, Math.floor(py) + 1);
+    for (let i = 0; i < n; i++) {
+      vy += 0.11;
+      if (!free(x + vx, y)) { vx = -vx; splashes.push([x + (vx > 0 ? 0 : 1), y, i * step, 'x']); }
+      else x += vx;
+      if (!free(x, y + vy)) { splashes.push([x, y + (vy > 0 ? 1.5 : 0), i * step, 'y']); vy = vy > 0 ? -Math.max(1.55, vy * 0.9) : Math.abs(vy) * 0.5; }
+      else y += vy;
+    }
+    splashes.forEach(([sx, sy, st, ax]) => {
+      const e = t - st; if (e > 420) return;
+      const f = 1 - e / 420;
+      for (let k = 0; k < 6; k++) {
+        const a = (k / 5) * Math.PI, r = e * 0.012 * (1 + (k % 2) * 0.4);
+        const dx = ax === 'y' ? Math.cos(a) * r * 1.6 : (vx > 0 ? 1 : -1) * Math.sin(a) * r;
+        const dy = ax === 'y' ? -Math.sin(a) * r : Math.cos(a) * r * 1.3;
+        set(sx + dx, sy + dy + 0.00002 * e * e, shade('#bfeaff', f));
+      }
+    });
+    set(x, y, '#9fdcff'); set(x + 1, y, '#5ab8ff'); set(x, y + 1, '#5ab8ff'); set(x + 1, y + 1, '#2a7ad8'); set(x + 0.5, y - 1, shade('#9fdcff', 0.6));
+  } else if (type === 'W') {   // beach wave: the water surface swells, curls over itself, lands, foams up slowly, then bubbles clear the screen
+    const ease = p => p < 0 ? 0 : p > 1 ? 1 : p * p * (3 - 2 * p);
+    const T1 = 2800, T2 = 4400, T3 = 6600, T4 = 11000;   // swell | curl | collapse + foam | bubbles
+    const base = y0 + h - 4.5, Amax = h - 7, sb = Math.max(10, w * 0.17);
+    let cx, A, D, sf;
+    if (t < T1) { const p = ease(t / T1); cx = x0 + w * (0.84 - 0.3 * p); A = Amax * p; D = 2.6 * p; sf = w * (0.11 - 0.04 * p); }
+    else { cx = x0 + w * 0.54; A = Amax; D = 2.6; sf = w * 0.07; }
+    const curl = t < T1 ? 0 : ease((t - T1) / (T2 - T1));          // 0 -> 1 as the lip throws over
+    const col = t < T2 ? 0 : ease((t - T2) / (T3 - T2));           // collapse: 0 -> 1
+    const top = base - A, trX = cx + sf * 2.4, trY = base + D;
+    const amp = A * (1 - col), dep = D * (1 - col);
+    const surf = x => {
+      const sg = x < cx ? sb : sf;
+      return base - amp * Math.exp(-(((x - cx) / sg) ** 2)) + dep * Math.exp(-(((x - trX) / (sf * 1.1)) ** 2))
+             + 0.5 * Math.sin(x * 0.35 + t * 0.004) * (1 - Math.min(1, amp / 3));
+    };
+    // where the lip touches down; foam spreads out from here
+    const contactX = trX, foamStart = T2 - 150;
+    const foam = (x, y) => {   // 0..1 how white this pixel is: grows slowly outward from the contact point
+      if (t < foamStart) return 0;
+      const e = t - foamStart - Math.abs(x - contactX) * 30;
+      const lvl = Math.max(0, Math.min(1, e / 2200));
+      return (hsh(Math.floor(x) * 41 + Math.floor(y) * 13) % 100) / 100 < lvl ? 1 : lvl > 0.15 && hsh(Math.floor(x) * 7 + Math.floor(y) * 3 + Math.floor(t / 130)) % 5 === 0 ? 0.5 : 0;
+    };
+    const gone = t < T3 ? 0 : Math.min(1, (t - T3) / (T4 - T3 - 700));   // whitewater breaks up into bubbles, dot by dot
+    const waterPx = (x, y, c) => {
+      if (gone && (hsh(Math.floor(x) * 29 + Math.floor(y) * 101) % 100) / 100 < gone) return;
+      const f = foam(x, y);
+      set(x, y, f === 1 ? '#ffffff' : f ? '#c8f0ff' : c);
+    };
+    for (let x = x0; x < x0 + w; x++) {   // water body with the double blue surface line
+      const sy = surf(x);
+      for (let y = Math.round(sy); y < y0 + h; y++) {
+        const d2 = y - sy;
+        waterPx(x, y, d2 < 1 ? '#5ad8ff' : d2 < 2 ? '#1a8ae8' : '#0636a0');
+      }
+    }
+    if (curl > 0) {   // the barrel: water fills the curl and the face bends round into a hollow tube under the lip
+      const rx = (trX - cx) / Math.sin(1.95), ry = (trY - top) / (1 - Math.cos(1.95)), Cy = top + ry, Aend = 1.95 * curl;
+      const hs2 = ease((curl - 0.2) / 0.8) * (1 - col);                    // hole grows as the lip throws, closes as it collapses
+      const hcx = cx + rx * 0.52, hcy = top + ry * 1.02, hrx = Math.max(1.5, rx * 0.27) * hs2, hry = Math.max(1.5, ry * 0.43) * hs2;
+      const inHole = (x, y) => hs2 > 0.05 && ((x + 0.5 - hcx) / hrx) ** 2 + ((y + 0.5 - hcy) / hry) ** 2 <= 1;
+      for (let x = Math.floor(cx); x <= trX + 2; x++) for (let y = Math.floor(top); y < y0 + h; y++) {
+        const ex = (x + 0.5 - cx) / rx, ey = (y + 0.5 - Cy) / ry;
+        const a3 = Math.atan2(ex, -ey);
+        const insideLip = ex >= 0 && ex * ex + ey * ey <= 1 && a3 <= Aend;
+        if (inHole(x, y)) { delete fb[Math.floor(x) + ',' + Math.floor(y)]; continue; }
+        if (insideLip && !(col > 0 && (hsh(x * 17 + y * 5) % 100) / 100 < col)) {
+          // light double line along the inside of the tube, deep blue in the thick of the water
+          const dh = hs2 > 0.05 ? Math.sqrt(((x + 0.5 - hcx) / hrx) ** 2 + ((y + 0.5 - hcy) / hry) ** 2) : 9;
+          waterPx(x, y, dh < 1.35 ? '#5ad8ff' : dh < 1.7 ? '#1a8ae8' : '#0636a0');
+        }
+      }
+    }
+    if (curl > 0) {   // the lip: the surface itself keeps going past the crest and curls over to the right
+      const Aend = 1.95 * curl;                                     // radians swept so far (~112 degrees when done)
+      const rx = (trX - cx) / Math.sin(1.95), ry = (trY - top) / (1 - Math.cos(1.95));
+      const n = Math.max(2, Math.round(60 * curl));
+      for (let i = 0; i <= n; i++) {
+        const a2 = Aend * i / n;
+        const lx = cx + rx * Math.sin(a2), ly0 = top + ry * (1 - Math.cos(a2));
+        const ly = ly0 + (surf(lx) - ly0) * col;                    // as it collapses the curl melts down onto the surface
+        if (col > 0.6) { if (hsh(i * 11 + Math.floor(t / 90)) % 3 === 0) continue; }
+        const ix = cx - lx, iy = (top + ry) - ly, il = Math.hypot(ix, iy) || 1;   // inward = toward the curl's center
+        const thick = 3.5 - 2 * (i / n);                            // thick at the crest, thin at the tip
+        for (let k2 = 0; k2 < thick; k2 += 0.5) {
+          const px2 = lx + ix / il * k2, py2 = ly + iy / il * k2;
+          waterPx(px2, py2, k2 < 1 ? '#5ad8ff' : k2 < 2 ? '#1a8ae8' : '#0636a0');
+        }
+      }
+    }
+    if (t > T3 - 900) {   // whitewater turns into bubbles that grow and float up across the whole screen
+      const N = Math.floor(w / 2.6);
+      for (let i = 0; i < N; i++) {
+        const hs = hsh(i * 57 + 9), born = T3 - 900 + (hs % 2000), e = t - born; if (e < 0) continue;
+        const bx = x0 + (i / N) * w + (hs >> 6) % 3, rise = 0.004 + ((hs >> 9) % 5) * 0.0012;
+        const by = Math.min(y0 + h - 2, surf(bx)) - e * rise - 0.0000009 * e * e;
+        const r = Math.min(2.8, 0.3 + e * 0.0009);
+        if (by + r < y0 - 1) continue;
+        const wob = Math.sin(e * 0.006 + i) * 0.6;
+        if (r < 0.9) { set(bx + wob, by, '#ffffff'); continue; }
+        for (let k2 = 0; k2 < 18; k2++) {
+          const ang = k2 / 18 * Math.PI * 2;
+          set(bx + wob + Math.cos(ang) * r, by + Math.sin(ang) * r, ang > 3.4 && ang < 4.8 ? '#ffffff' : '#9fdfff');
+        }
+      }
+    }
+  } else if (type === '~') {   // big rainbow wave
+    for (let x = x0; x < x0 + w; x++) for (let k = 0; k < 2; k++) {
+      const yy = cy - 0.5 + (h / 2 - 2) * Math.sin(x * 0.12 + t * 0.006 + k * Math.PI);
+      const c = HUEC(130 + (x - x0) * 2 + k * 60);
+      set(x, yy, c); set(x, yy + 1, shade(c, 0.5));
+    }
+  } else if (type === '*') {   // sparkles over the whole sign
+    const tt = Math.floor(t / 110);
+    for (let x = x0; x < x0 + w; x++) for (let y = y0; y < y0 + h; y++) {
+      const v = hsh(x * 73 + y * 151 + tt * 37) % 60;
+      if (v === 0) { set(x, y, '#ffffff'); set(x - 1, y, '#606060'); set(x + 1, y, '#606060'); set(x, y - 1, '#606060'); set(x, y + 1, '#606060'); }
+      else if (v === 1) set(x, y, '#c89600'); else if (v === 2) set(x, y, '#60c8ff');
+    }
+  } else if (type === '>') {   // big chevrons chasing right to left
+    const gap = Math.max(10, h), off = (t * 0.03) % gap, act = Math.floor(t / 110);
+    for (let i = -1; i * gap < w + gap; i++) {
+      const bx = x0 + i * gap - off, lit = ((i % 6) + 6) % 6 === ((-act % 6) + 6) % 6;
+      for (let y = 0; y < h; y++) {
+        const dx = Math.abs(y + 0.5 - h / 2) * 0.7;
+        for (let k = 0; k < 3; k++) set(bx + dx + k, y0 + y, lit ? '#ffffff' : '#ffa000');
+      }
     }
   }
 }
-const isPhone = s => /\d/.test(s) && /^[\d\-. ]+$/.test(s);
-function raster(text, base, now = performance.now()) {   // -> array of columns, each 8 colors|null
-  const out = [];
-  if (isPhone(text)) {
-    for (const ch of text) {
-      if (/\d/.test(ch)) {
-        const g = DIG[+ch];
-        for (let c = 0; c < 4; c++) out.push([...Array(8)].map((_, r) => r < 7 && (g[r] & (8 >> c)) ? base : null));
-        out.push(Array(8).fill(null));
-      } else {
-        const a = Array(8).fill(null), b = Array(8).fill(null);
-        if (ch === '-') { a[3] = base; b[3] = base; }
-        if (ch === '.') a[6] = base;
-        out.push(a, b, Array(8).fill(null));
-      }
-    }
-    out.pop();
-    return out;
-  }
+function isPhone(s) { const t = s.replace(/\{[^}]*\}/g, ''); return /\d/.test(t) && /^[\d\-. ]+$/.test(t); }
+function raster(text, base, now = performance.now(), font = 'classic') {
+  const out = [], H = fontH(font);
   let color = base;
   for (let i = 0; i < text.length; i++) {
     if (text[i] === '{') {
       const e = text.indexOf('}', i);
       if (e > 0) {
         const c = text.slice(i + 1, e);
-        if (c.length === 1 && ANIMW[c]) out.push(...animCols(c, now));
+        if (c.length === 1 && ANIMW[c]) {
+          const pad = (H - 8) / 2;
+          animCols(c, now).forEach(col => out.push([...Array(pad).fill(null), ...col, ...Array(pad).fill(null)]));
+        }
         else if (c.length === 6) color = '#' + c;
         else if (c.length === 0) color = base;
         i = e; continue;
       }
     }
-    glyph(text[i]).forEach(col => out.push(col.map(on => on ? color : null)));
+    fontGlyph(text[i], font).forEach(col => out.push(col.map(on => on ? color : null)));
   }
+  while (out.length > 1 && out[out.length - 1].every(v => !v) && out[out.length - 2].every(v => !v)) out.pop();
   return out;
 }
 
 const pv = $('pv'), ctx = pv.getContext('2d');
 let playing = false, offsets = [], lastStep = [], holds = [];
+function coveredRows() {
+  return new Set(state.big.on ? [0, 1] : []);
+}
+
+// ---------- big screen (tall double-line) text ----------
+const BIGFONTS = [   // [key, name, font family, width squeeze, weight]
+  ['classic', 'Classic', 'monospace', 1, 700],
+  ['block',   'Block',   '"Arial Black", Impact, sans-serif', 1.05, 900],
+  ['narrow',  'Narrow',  'sans-serif-condensed, "Arial Narrow", Arial, sans-serif', 0.75, 700],
+  ['tall',    'Tall',    'sans-serif-condensed, "Arial Narrow", Arial, sans-serif', 0.5, 700],
+  ['script',  'Script',  'cursive, "Brush Script MT", "Segoe Script"', 1, 700] ];
+const BIGSIZES = [ [8, 'Small (8 dots)'], [12, 'Medium (12 dots)'], [16, 'Full height (16 dots)'] ];
+const bigCv = document.createElement('canvas'), bctx = bigCv.getContext('2d', { willReadFrequently:true });
+const bigCache = {};
+function bigGlyph(ch, b) {   // -> columns of h booleans
+  const h = BIGSIZES[b.size][0], key = [ch, b.font, h, b.bold, b.italic].join('|');
+  if (bigCache[key]) return bigCache[key];
+  const blank = () => Array(h).fill(false);
+  const F = BIGFONTS.find(f => f[0] === b.font) || BIGFONTS[0];
+  let out;
+  if ((b.font === 'tall' || b.font === 'classic') && /\d/.test(ch)) {   // big number font stretched to the chosen height
+    const d = DIG[+ch], w = Math.max(4, Math.round(h * (b.font === 'tall' ? 0.42 : 0.55))) + (b.bold ? 1 : 0);
+    const sh = b.italic ? Math.round(h * 0.22) : 0;
+    out = [...Array(w + sh)].map(blank);
+    for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) {
+      const r = Math.min(6, Math.floor(y / h * 7)), c = Math.min(3, Math.floor(x / w * 4)),
+            c2 = b.bold ? Math.min(3, Math.floor(Math.max(0, x - 1) / w * 4)) : c;
+      if ((d[r] & (8 >> c)) || (d[r] & (8 >> c2))) out[x + Math.round((h - 1 - y) / (h - 1) * sh)][y] = true;
+    }
+    out.push(blank());
+  } else if (ch === ' ') {
+    out = [...Array(Math.max(2, Math.round(h * (b.font === 'tall' ? 0.2 : 0.33))))].map(blank);
+  } else {
+    const S = 10, px = h * S, lean = b.italic ? 0.24 : 0;
+    bigCv.width = px * 2; bigCv.height = px;
+    bctx.setTransform(1, 0, 0, 1, 0, 0); bctx.clearRect(0, 0, bigCv.width, px);
+    bctx.font = `${b.bold ? Math.min(900, F[4] + 200) : F[4]} ${px * 1.18}px ${F[2]}`;
+    bctx.textBaseline = 'alphabetic'; bctx.fillStyle = '#fff';
+    const mw = bctx.measureText(ch).width * F[3];
+    bctx.setTransform(F[3], 0, -lean, 1, px * lean, 0);   // squeeze + italic slant
+    bctx.fillText(ch, 0, px * 0.9);
+    if (b.bold) bctx.fillText(ch, S * 0.6 / F[3], px * 0.9);
+    bctx.setTransform(1, 0, 0, 1, 0, 0);
+    const cols = Math.max(1, Math.ceil((mw + px * lean + (b.bold ? S : 0)) / S));
+    const d = bctx.getImageData(0, 0, bigCv.width, px).data;
+    out = [];
+    for (let cx = 0; cx < cols; cx++) {
+      const col = [];
+      for (let cy = 0; cy < h; cy++) {
+        let sum = 0;
+        for (let x = cx * S; x < cx * S + S; x++) for (let y = cy * S; y < cy * S + S; y++) sum += d[(y * bigCv.width + x) * 4 + 3];
+        col.push(sum / (S * S) > 100);
+      }
+      out.push(col);
+    }
+    while (out.length > 1 && out[0].every(v => !v)) out.shift();
+    while (out.length > 1 && out[out.length - 1].every(v => !v)) out.pop();
+    out.push(blank());
+    if (h >= 12 && b.font !== 'tall') out.push(blank());
+  }
+  return bigCache[key] = out;
+}
+function bigRaster(b, now) {   // -> columns of 16 colors|null
+  const h = BIGSIZES[b.size][0], pad = (16 - h) / 2, out = [];
+  let color = b.color;
+  const t = b.text;
+  for (let i = 0; i < t.length; i++) {
+    if (t[i] === '{') {
+      const e = t.indexOf('}', i);
+      if (e > 0) {
+        const c = t.slice(i + 1, e);
+        if (c.length === 1 && ANIMW[c]) animCols(c, now).forEach(col => out.push([null, null, null, null, ...col, null, null, null, null]));
+        else if (c.length === 6) color = '#' + c;
+        else if (c.length === 0) color = b.color;
+        i = e; continue;
+      }
+    }
+    bigGlyph(t[i], b).forEach(col => out.push([...Array(pad).fill(null), ...col.map(on => on ? color : null), ...Array(pad).fill(null)]));
+  }
+  return out;
+}
+let bigOff, bigLast = 0, bigFrame = null;
+function drawBig(fb, now) {
+  const b = state.big; if (!b.text) return;
+  const used = rowsUsed();
+  let a = 9999, e = 0;
+  [0, 1].filter(r => used.includes(r)).forEach(r => { const [x0, x1] = rowSpan(r); a = Math.min(a, x0); e = Math.max(e, x1); });
+  if (e === 0) return;
+  const W = e - a, cols = bigRaster(b, now), tw = cols.length;
+  const put = (cs, x) => cs.forEach((col, i) => col.forEach((c, y) => { if (c) fb[(x + i) + ',' + y] = c; }));
+  if (!b.scroll) { put(cols, a + Math.max(0, Math.floor((W - tw) / 2))); return; }
+  const aw = ANIMW[b.anim] || 0;
+  let gapPx = 0;
+  if (b.gap !== 'B') { gapPx = Math.max(12, (+b.gap) * PW); if (aw) gapPx = Math.max(gapPx, aw + 4); }
+  const cycle = tw + gapPx + 1;
+  if (bigOff === undefined) bigOff = playing ? W : 0;
+  if (playing && (!bigLast || now - bigLast > 500)) bigLast = now;
+  const bst = stepMs(b.speed);
+  while (playing && now - bigLast >= bst) {
+    bigLast += bst; bigOff--;
+    if (gapPx) { if (bigOff <= -cycle) { bigOff += cycle; onWrap(-1, now); } }
+    else if (bigOff < -tw) { bigOff = W; onWrap(-1, now); }
+  }
+  const x0 = a + bigOff;
+  if (!gapPx) { put(cols, x0); return; }
+  for (let cx = x0; cx < e; cx += cycle) {
+    put(cols, cx);
+    if (aw) {
+      const n = Math.max(1, Math.floor(gapPx / aw)), gx = cx + tw + 1 + Math.floor((gapPx - n * aw) / 2), ac = animCols(b.anim, now);
+      for (let k = 0; k < n; k++) ac.forEach((col, i) => col.forEach((c, y) => { if (c) fb[(gx + k * aw + i) + ',' + (y + 4)] = c; }));
+    }
+  }
+}
 function rowSpan(r) {
   const xs = state.layout.filter(p => p[1] === r).map(p => p[0]);
   return [Math.min(...xs) * PW, (Math.max(...xs) + 1) * PW];
 }
-function resetSim() { loopCount = 0; sceneStart = 0; offsets = []; holds = []; rowsUsed().forEach(r => { const [a, b] = rowSpan(r); offsets[r] = playing ? b - a : 0; holds[r] = 0; lastStep[r] = 0; }); }
+function resetSim() { bigOff = undefined; bigLast = 0; loopCount = 0; sceneStart = 0; offsets = []; holds = []; rowsUsed().forEach(r => { const [a, b] = rowSpan(r); offsets[r] = playing ? b - a : 0; holds[r] = 0; lastStep[r] = 0; }); }
 
 function drawPreview(now = performance.now()) {
   const S = 10, used = rowsUsed();
@@ -444,28 +1108,33 @@ function drawPreview(now = performance.now()) {
   ctx.clearRect(0, 0, w, h);
   const ox = mx * PW * S, oy = my * PH * S;
   const fb = {};
-  const inScene = playing && sceneStart && state.scene.type !== '-' && now - sceneStart < SCENE_MS;
-  if (inScene) drawScene(fb, now - sceneStart);
+  const inScene = playing && sceneStart && state.scene.type !== '-' && now - sceneStart < sceneLen(state.scene.type);
+  if (inScene) drawScene(fb, now - sceneStart, state.scene.type, ...sceneBox(), (x, y) => occupied.has(Math.floor(x / PW) + ',' + Math.floor(y / PH)));
   else if (sceneStart) { sceneStart = 0; used.forEach(r => lastStep[r] = now); }
+  const covered = coveredRows();
   if (!inScene) used.forEach(r => {
-    const ln = state.lines[r]; if (!ln.text) return;
-    const [a, b] = rowSpan(r), W = b - a, cols = raster(ln.text, ln.color, now), tw = cols.length;
+    const ln = state.lines[r]; if (!ln.text || covered.has(r)) return;
+    const tall = ln.font === 'tall', H = tall ? 16 : 8;
+    let [a, b] = rowSpan(r);
+    if (tall && used.includes(r + 1)) { const [a2, b2] = rowSpan(r + 1); a = Math.min(a, a2); b = Math.max(b, b2); }
+    const W = b - a, cols = raster(ln.text, ln.color, now, ln.font), tw = cols.length;
     const put = (cs, x, dy = 0) => cs.forEach((col, i) => col.forEach((c, y) => {
-      if (c && y + dy < PH) fb[(x + i) + ',' + (r * PH + y + dy)] = c; }));
+      if (c && y + dy < H) fb[(x + i) + ',' + (r * PH + y + dy)] = c; }));
     if (!ln.scroll) { put(cols, a + Math.max(0, Math.floor((W - tw) / 2))); return; }
     const aw = ANIMW[ln.anim] || 0;
     let gapPx = 0;
     if (ln.gap !== 'B') { gapPx = Math.max(12, (+ln.gap) * PW); if (aw) gapPx = Math.max(gapPx, aw + 4); }
     const cycle = tw + gapPx + 1;
     if (offsets[r] === undefined) offsets[r] = W;
-    const step = 90 - (ln.speed - 1) * (75 / 9);
-    if (playing && now - lastStep[r] >= step) {
-      lastStep[r] = now;
+    const step = stepMs(ln.speed);
+    if (playing && (!lastStep[r] || now - lastStep[r] > 500)) lastStep[r] = now;
+    while (playing && now - lastStep[r] >= step) {
+      lastStep[r] += step;
       if (holds[r] > 0) holds[r]--;
       else {
         offsets[r]--;
         if (gapPx) { if (offsets[r] <= -cycle) { offsets[r] += cycle; onWrap(r, now); } }
-        else { if (offsets[r] < -tw) { offsets[r] = W; onWrap(r, now); } if (isPhone(ln.text) && offsets[r] === 0) holds[r] = 40; }
+        else { if (offsets[r] < -tw) { offsets[r] = W; onWrap(r, now); } if (ln.font === 'digital' && offsets[r] === 0) holds[r] = 40; }
       }
     }
     const x0 = a + offsets[r];
@@ -474,10 +1143,11 @@ function drawPreview(now = performance.now()) {
       put(cols, cx);
       if (aw) {
         const n = Math.max(1, Math.floor(gapPx / aw)), gx = cx + tw + 1 + Math.floor((gapPx - n * aw) / 2), ac = animCols(ln.anim, now);
-        for (let k = 0; k < n; k++) put(ac, gx + k * aw);
+        for (let k = 0; k < n; k++) put(ac, gx + k * aw, (H - 8) / 2);
       }
     }
   });
+  if (state.big.on && !inScene) drawBig(fb, now);
   const dim = 0.35 + 0.65 * (state.bright / 100);
   for (let gy = 0; gy < ROWS; gy++) for (let gx = 0; gx < COLS; gx++) {
     if (!occupied.has(gx + ',' + gy)) continue;
@@ -501,18 +1171,107 @@ $('fs').onclick = async () => {
 };
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) try { screen.orientation.unlock(); } catch {} });
 function loop(t) { if (!playing) return; drawPreview(t); requestAnimationFrame(loop); }
-$('play').onclick = () => {
-  playing = !playing;
+function setPlaying(on) {
+  if (on === playing) return;
+  playing = on;
   $('play').textContent = playing ? '■ Stop preview' : '▶ Play preview';
   resetSim(); playing ? requestAnimationFrame(loop) : drawPreview();
+}
+$('play').onclick = () => setPlaying(!playing);
+function showScene() {
+  if (state.scene.type === '-') return;
+  setPlaying(true);
+  sceneStart = performance.now();
+}
+$('showScene').onclick = () => { showScene(); if (rx && dataCh) send('SHOW'); };
+function renderScenePick() {
+  const box = $('scenePick'); box.innerHTML = '';
+  box.appendChild(makePicker({ options: SCENES, value: state.scene.type, thumb: sceneThumb,
+    onPick: k => { state.scene.type = k; showScene(); } }));
+}
+(function appWord() {
+  const cols = raster('APPLICATION', '#ffa000', 0);
+  const cv = $('appword'), S = 2.5;
+  dots(cv, cols.length, 8, S, (x, y) => cols[x][y]);
+  cv.style.height = 8 * S + 'px';
+})();
+
+// ---------- big screen card wiring ----------
+const PALETTE = ['#ffa000', '#ffd000', '#ff6a00', '#ff0000', '#ff3090', '#ff00ff', '#c040ff', '#7a2cff',
+                 '#1e4bff', '#3aa0ff', '#00c8c8', '#00c896', '#00e05a', '#90ff20', '#ffffff', '#ffd8a0', '#a0a0a0'];
+let bigSel = null;   // picked swatch
+function renderBigChips() {
+  $('bigChips').innerHTML = chipsHtml(9);
+  $('bigChips').querySelectorAll('[data-i]').forEach(el => el.onclick = () => {
+    const i = +el.dataset.i;
+    if (colorRow !== 9) { colorRow = 9; selA = i; selB = null; }
+    else if (selA === null || selB !== null) { selA = i; selB = null; } else selB = i;
+    renderColorCard();
+  });
+}
+function renderBig() {
+  const b = state.big;
+  $('bigOn').checked = b.on; $('bigBody').hidden = !b.on;
+  $('bigText').value = b.text;
+  $('bm0').className = 'sec' + (b.scroll ? '' : ' on'); $('bm1').className = 'sec' + (b.scroll ? ' on' : '');
+  $('bigGapRow').style.display = b.scroll ? 'block' : 'none';
+  $('bigGap').value = GAPS.indexOf(b.gap); $('bigGl').textContent = GAPNAME[b.gap];
+  $('bigSpeed').value = b.speed; $('bigSv').textContent = b.speed;
+  $('bigSize').value = b.size; $('bigSzl').textContent = BIGSIZES[b.size][1];
+  $('bigB').className = 'sec' + (b.bold ? ' on' : ''); $('bigI').className = 'sec' + (b.italic ? ' on' : '');
+  $('bigFonts').innerHTML = '';
+  BIGFONTS.forEach(([k, n, fam]) => {
+    const btn = document.createElement('button');
+    btn.className = 'sec' + (b.font === k ? ' on' : ''); btn.textContent = n; btn.style.fontFamily = fam;
+    btn.onclick = () => { b.font = k; renderBig(); resetSim(); drawPreview(); };
+    $('bigFonts').appendChild(btn);
+  });
+  $('bigPal').innerHTML = '';
+  [...PALETTE, 'custom'].forEach(c => {
+    const s = document.createElement(c === 'custom' ? 'label' : 'div');
+    s.className = 'sw' + (c === b.color ? ' cur' : '');
+    if (c === 'custom') {
+      s.style.background = 'conic-gradient(red, yellow, lime, cyan, blue, magenta, red)'; s.title = 'Custom color';
+      s.innerHTML = '<input type="color" style="opacity:0;width:0;height:0">';
+      s.querySelector('input').oninput = e => pickBig(e.target.value);
+    } else { s.style.background = c; s.onclick = () => pickBig(c); }
+    $('bigPal').appendChild(s);
+  });
+  ['bigGapPick', 'bigInsPick'].forEach(id => $(id).innerHTML = '');
+  $('bigGapPick').appendChild(makePicker({ options: ANIMS, value: b.anim, thumb: animThumb,
+    onPick: k => { b.anim = k; resetSim(); drawPreview(); } }));
+  $('bigInsPick').appendChild(makePicker({ options: ANIMS.slice(1), value: null, thumb: animThumb, label: '+ Pick an animation to insert',
+    onPick: k => { const p = Math.min(b._caret ?? b.text.length, b.text.length);
+      b.text = b.text.slice(0, p) + ' {' + k + '} ' + b.text.slice(p); b._caret = p + 5;
+      $('bigText').value = b.text; renderBigChips(); drawPreview(); } }));
+  renderBigChips();
+}
+function pickBig(c) {   // letters selected -> color just those, otherwise the whole text
+  if (colorRow === 9 && selRange()) paint(hex(c));
+  else { state.big.color = c; renderBig(); drawPreview(); }
+}
+$('bigOn').onchange = e => { state.big.on = e.target.checked; renderBig(); renderLines(); resetSim(); drawPreview(); };
+$('bigText').oninput = e => { state.big.text = e.target.value; state.big._caret = e.target.selectionStart; renderBigChips(); drawPreview(); };
+$('bigText').onkeyup = $('bigText').onclick = $('bigText').onblur = e => { state.big._caret = e.target.selectionStart; };
+$('bm0').onclick = () => { state.big.scroll = false; renderBig(); resetSim(); drawPreview(); };
+$('bm1').onclick = () => { state.big.scroll = true; renderBig(); resetSim(); drawPreview(); };
+$('bigGap').oninput = e => { state.big.gap = GAPS[+e.target.value]; $('bigGl').textContent = GAPNAME[state.big.gap]; resetSim(); drawPreview(); };
+$('bigSpeed').oninput = e => { state.big.speed = +e.target.value; $('bigSv').textContent = state.big.speed; };
+$('bigSize').oninput = e => { state.big.size = +e.target.value; $('bigSzl').textContent = BIGSIZES[state.big.size][1]; resetSim(); drawPreview(); };
+$('bigB').onclick = () => { state.big.bold = !state.big.bold; renderBig(); resetSim(); drawPreview(); };
+$('bigI').onclick = () => { state.big.italic = !state.big.italic; renderBig(); resetSim(); drawPreview(); };
+$('fontTog').onclick = () => { const h = !$('fontBox').hidden; $('fontBox').hidden = h; $('fontTog').textContent = '🎨 Font & color ' + (h ? '▾' : '▴'); };
+$('tileTog').onclick = () => { const h = !$('tileBox').hidden; $('tileBox').hidden = h; $('tileTog').textContent = 'Color single letters ' + (h ? '▾' : '▴'); };
+$('bigClr').onclick = () => {
+  if (colorRow === 9 && selRange()) paint(null);
+  else { state.big.text = untokenize(tokenize(state.big.text).map(t => t.anim ? t : { ...t, color:null })); $('bigText').value = state.big.text; renderBigChips(); drawPreview(); }
 };
 
 function renderAll() {
   while (state.lines.length < ROWS) state.lines.push(L(false, ''));
-  renderGrid(); renderLines(); resetSim();
+  renderGrid(); renderBig(); renderLines(); resetSim();
   $('bright').value = state.bright; setGauge(state.bright);
-  $('scenes').innerHTML = SCENES.map(([k, n]) => `<button class="sec sc ${state.scene.type === k ? 'on' : ''}" data-s="${k}">${n}</button>`).join('');
-  document.querySelectorAll('.sc').forEach(b => b.onclick = () => { state.scene.type = b.dataset.s; renderAll(); });
+  renderScenePick();
   $('every').value = state.scene.every; $('evl').textContent = state.scene.every;
   drawPreview();
 }
@@ -521,7 +1280,8 @@ function renderAll() {
 const SVC = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const RX  = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
 const TX  = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
-let rx = null, busy = Promise.resolve();
+let rx = null, dataCh = null, busy = Promise.resolve();
+const DATA = '6e400004-b5a3-f393-e0a9-e50e24dcca9e';
 
 async function connect() {
   if (!navigator.bluetooth) { alert('This browser has no Bluetooth. On Android use Chrome; on iPhone use the Bluefy app.'); return; }
@@ -531,6 +1291,8 @@ async function connect() {
     const gatt = await dev.gatt.connect();
     const svc = await gatt.getPrimaryService(SVC);
     rx = await svc.getCharacteristic(RX);
+    try { dataCh = await svc.getCharacteristic(DATA); } catch { dataCh = null; log('This sign has the old program - flash TruckSign v3 by USB once.'); }
+    sentHash = {};
     const tx = await svc.getCharacteristic(TX);
     await tx.startNotifications();
     tx.addEventListener('characteristicvaluechanged', e => log(new TextDecoder().decode(e.target.value)));
@@ -544,19 +1306,163 @@ function send(cmd) {
              .catch(e => log('Send failed: ' + e.message));
 }
 $('connect').onclick = connect;
-$('send').onclick = () => {
-  // lines first, layout last (a panel-count change restarts the sign)
-  state.lines.forEach((ln, i) => send(`L${i + 1}:${ln.scroll ? 'S' : 'T'}${ln.gap}${ln.anim}|${ln.speed}|${hex(ln.color)}|${ln.text.replace(/[^\x20-\x7E]/g, '')}`));
-  send('BRIGHT:' + state.bright);
-  send('SCENE:' + state.scene.type + state.scene.every);
-  send('LAYOUT:' + state.layout.map(p => p.join(',')).join(';'));
+// ---------- turn everything into clips for the sign ----------
+const CLIP_FRAMES = 32, CLIP_MS = 50, SCENE_STEP = 40;
+const hasAnimCode = t => /\{[$~D*>]\}/.test(t);
+function cycleCols(cols, H, W, scroll, gap, anim, now) {   // one repeat of a scrolling line, same math as the preview
+  if (!scroll) return cols;
+  if (gap === 'B') return [...cols, ...[...Array(W)].map(() => Array(H).fill(null))];
+  const aw = ANIMW[anim] || 0, tw = cols.length;
+  let gapPx = Math.max(12, (+gap) * PW); if (aw) gapPx = Math.max(gapPx, aw + 4);
+  const out = [...cols, ...[...Array(gapPx + 1)].map(() => Array(H).fill(null))];
+  if (aw) {
+    const n = Math.max(1, Math.floor(gapPx / aw)), gx = tw + 1 + Math.floor((gapPx - n * aw) / 2), ac = animCols(anim, now), dy = (H - 8) / 2;
+    for (let k = 0; k < n; k++) ac.forEach((col, i) => col.forEach((c, y) => { if (c && out[gx + k * aw + i]) out[gx + k * aw + i][y + dy] = c; }));
+  }
+  return out;
+}
+function rowWidth(rows) {
+  let a = 9999, e = 0;
+  rows.filter(r => rowsUsed().includes(r)).forEach(r => { const [x0, x1] = rowSpan(r); a = Math.min(a, x0); e = Math.max(e, x1); });
+  return e - a;
+}
+function colsToFrame(cols, H) { const w = cols.length, f = []; for (let y = 0; y < H; y++) for (let x = 0; x < w; x++) f.push(cols[x][y] || null); return { w, h:H, px:f }; }
+function encodeClip(frames, ms) {   // frames: [{w,h,px:[color|null]}] -> Uint8Array in the TSC1 format
+  const w = frames[0].w, h = frames[0].h;
+  let q = 1, map;
+  for (;;) {   // build palette, coarsen colors if there are more than 255
+    map = new Map();
+    const key = c => { const v = parseInt(c.slice(1), 16); return ((((v >> 16) & 255) / q | 0) * q) + ',' + ((((v >> 8) & 255) / q | 0) * q) + ',' + (((v & 255) / q | 0) * q); };
+    frames.forEach(f => f.px.forEach(c => { if (c && c !== '#000000') { const k = key(c); if (!map.has(k)) map.set(k, map.size + 1); } }));
+    if (map.size <= 255) { map.key = key; break; }
+    q *= 2;
+  }
+  const pal = [...map.keys()].map(k => k.split(',').map(Number));
+  const bodies = frames.map(f => {
+    const out = []; let run = 0, cur = -1;
+    f.px.forEach(c => {
+      const idx = c && c !== '#000000' ? map.get(map.key(c)) : 0;
+      if (idx === cur && run < 255) run++; else { if (run) out.push(run, cur); cur = idx; run = 1; }
+    });
+    out.push(run, cur);
+    return out;
+  });
+  const head = 13 + pal.length * 3 + frames.length * 4, total = head + bodies.reduce((s, b) => s + b.length, 0);
+  const u = new Uint8Array(total), dv = new DataView(u.buffer);
+  u.set([84, 83, 67, 49]); dv.setUint16(4, w, true); dv.setUint16(6, h, true); dv.setUint16(8, frames.length, true); dv.setUint16(10, ms, true); u[12] = pal.length;
+  pal.forEach((c, i) => u.set(c, 13 + i * 3));
+  let off = 0, pos = head;
+  bodies.forEach((b, i) => { dv.setUint32(13 + pal.length * 3 + i * 4, off, true); u.set(b, pos); pos += b.length; off += b.length; });
+  return u;
+}
+function lineClip(r) {
+  const ln = state.lines[r], W = rowWidth([r]);
+  const animated = hasAnimCode(ln.text) || (ln.scroll && ln.gap !== 'B' && ln.anim !== '-');
+  const n = animated ? CLIP_FRAMES : 1, frames = [];
+  for (let i = 0; i < n; i++) { const t = i * CLIP_MS; frames.push(colsToFrame(cycleCols(raster(ln.text, ln.color, t, ln.font), 8, W, ln.scroll, ln.gap, ln.anim, t), 8)); }
+  return encodeClip(frames, CLIP_MS);
+}
+function bigClip() {
+  const b = state.big, W = rowWidth([0, 1]);
+  const animated = hasAnimCode(b.text) || (b.scroll && b.gap !== 'B' && b.anim !== '-');
+  const n = animated ? CLIP_FRAMES : 1, frames = [];
+  for (let i = 0; i < n; i++) { const t = i * CLIP_MS; frames.push(colsToFrame(cycleCols(bigRaster(b, t), 16, W, b.scroll, b.gap, b.anim, t), 16)); }
+  return encodeClip(frames, CLIP_MS);
+}
+function sceneClip() {
+  const [x0, y0, w, h] = sceneBox(), type = state.scene.type, L = sceneLen(type);
+  const occupied = new Set(state.layout.map(p => p[0] + ',' + p[1]));
+  const occ = (x, y) => occupied.has(Math.floor(x / PW) + ',' + Math.floor(y / PH));
+  const frames = [];
+  for (let t = 0; t < L; t += SCENE_STEP) {
+    const fb = {}; drawScene(fb, t, type, x0, y0, w, h, occ);
+    const px = [];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) px.push(fb[(x0 + x) + ',' + (y0 + y)] || null);
+    frames.push({ w, h, px });
+  }
+  return encodeClip(frames, SCENE_STEP);
+}
+let sentHash = {};
+const hashBytes = u => { let h = 2166136261; for (let i = 0; i < u.length; i++) h = Math.imul(h ^ u[i], 16777619); return (h >>> 0) + ':' + u.length; };
+async function sendFile(name, u, done, total) {
+  const hb = hashBytes(u);
+  if (sentHash[name] === hb) return 0;
+  const enc = new TextEncoder().encode(name), begin = new Uint8Array(enc.length + 6);
+  begin[0] = 66; begin.set(enc, 1); new DataView(begin.buffer).setUint32(enc.length + 2, u.length, true);
+  await dataCh.writeValueWithResponse(begin);
+  const CH = 240;
+  for (let i = 0; i < u.length; i += CH) {
+    const part = u.subarray(i, i + CH), pkt = new Uint8Array(part.length + 1);
+    pkt[0] = 68; pkt.set(part, 1);
+    await dataCh.writeValueWithResponse(pkt);
+    $('progbar').style.width = Math.round((done + i + part.length) / total * 100) + '%';
+  }
+  await dataCh.writeValueWithResponse(new Uint8Array([69]));
+  sentHash[name] = hb;
+  return u.length;
+}
+let sending = false;
+$('send').onclick = async () => {
+  if (!rx) { alert('Connect first'); return; }
+  if (!dataCh) { alert('This sign still has the old program. Flash TruckSign v3 by USB once, then try again.'); return; }
+  if (sending) return;
+  sending = true; $('send').textContent = 'Sending…';
+  try {
+    await busy;
+    const used = rowsUsed(), cmds = [], files = [];
+    for (let r = 0; r < 3; r++) {
+      const ln = state.lines[r], on = used.includes(r) && !!ln.text && !(state.big.on && r < 2);
+      if (on) files.push(['l' + r, lineClip(r)]);
+      const hold = on && ln.scroll && ln.gap === 'B' && ln.font === 'digital' ? 40 : 0;
+      cmds.push(`LINE:${r},${on ? 1 : 0},${ln.scroll ? 'S' : 'T'},${stepMs(ln.speed).toFixed(1)},${hold}`);
+    }
+    const b = state.big, bigOn = b.on && !!b.text;
+    if (bigOn) files.push(['big', bigClip()]);
+    cmds.push(`LINE:3,${bigOn ? 1 : 0},${b.scroll ? 'S' : 'T'},${stepMs(b.speed).toFixed(1)},0`);
+    const scOn = state.scene.type !== '-';
+    if (scOn) files.push(['scn', sceneClip()]);
+    cmds.push(`SCENE:${scOn ? 1 : 0},${state.scene.every}`);
+    cmds.push('BRIGHT:' + state.bright);
+    const total = files.reduce((s, f) => sentHash[f[0]] === hashBytes(f[1]) ? s : s + f[1].length, 0) || 1;
+    $('prog').hidden = false; $('progbar').style.width = '0%';
+    log(`Sending ${files.length} picture file(s), ${Math.round(total / 1024)} KB…`);
+    let done = 0;
+    for (const [n, u] of files) done += await sendFile(n, u, done, total);
+    $('progbar').style.width = '100%';
+    cmds.forEach(send);
+    send('LAYOUT:' + state.layout.map(p => p.join(',')).join(';'));   // last: a panel-count change restarts the sign
+    await busy;
+    log('Sent ✓');
+  } catch (e) { log('Send failed: ' + e.message); sentHash = {}; }
+  sending = false; $('send').textContent = 'Send to sign';
+  setTimeout(() => $('prog').hidden = true, 1500);
 };
 $('every').oninput = e => { state.scene.every = +e.target.value; $('evl').textContent = state.scene.every; };
 $('test').onclick = () => send('TEST');
 $('get').onclick = () => send('GET');
 
-document.getElementById('inlineAnims').innerHTML = ANIMS.slice(1).map(([k, n]) => `<button class="sec ia" data-a="${k}">${n}</button>`).join('');
-document.querySelectorAll('.ia').forEach(b => { b.onpointerdown = e => e.preventDefault(); b.onclick = () => insertAt(' {' + b.dataset.a + '} '); });
+// ---------- sliders only move when you drag the knob (a scroll swipe across a slider is ignored) ----------
+(function guardSliders() {
+  const nearThumb = (el, x) => {
+    const r = el.getBoundingClientRect(), f = (el.value - el.min) / (el.max - el.min);
+    return Math.abs(x - (r.left + 13 + f * (r.width - 26))) < 30;
+  };
+  document.addEventListener('pointerdown', e => {
+    const el = e.target; if (!(el instanceof HTMLInputElement) || el.type !== 'range') return;
+    el._old = el.value; el._ok = e.pointerType === 'mouse' || nearThumb(el, e.clientX);
+  }, true);
+  document.addEventListener('input', e => {
+    const el = e.target; if (!(el instanceof HTMLInputElement) || el.type !== 'range' || el._ok !== false) return;
+    el.value = el._old; e.stopImmediatePropagation();   // not a knob drag: put it back, don't apply
+  }, true);
+  document.addEventListener('pointercancel', e => {   // the page started scrolling: undo anything the touch did
+    const el = e.target; if (!(el instanceof HTMLInputElement) || el.type !== 'range' || el._old === undefined) return;
+    if (el.value !== el._old) { el.value = el._old; el._ok = true; el.dispatchEvent(new Event('input', { bubbles:true })); }
+    el._old = undefined;
+  }, true);
+  document.addEventListener('pointerup', e => { const el = e.target; if (el instanceof HTMLInputElement && el.type === 'range') { el._ok = undefined; el._old = undefined; } }, true);
+})();
+
 renderPresets();
 renderAll();
 </script>
