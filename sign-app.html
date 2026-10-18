@@ -256,7 +256,7 @@ const BUILTIN = [
   { name:'4-2 Tall scrolling ad', layout:[[0,0],[1,0],[2,0],[3,0],[1,1],[2,1]], lines:[L(true, AD, '#ffa000'), L(false, PHONE), L(false, '')], bright:60,
     big:{ on:true, text:'WHOLESALE {FFFFFF}CABINETS{} {$} HALF PRICE' } },
 ];
-const ANIMS = [ ['-', 'None'], ['$', '$ Dollars'], ['~', '〰 Wave'], ['D', '🐬 Dolphin'], ['*', '✦ Sparkle'], ['>', '» Arrows'], ['P', 'ᗧ Pac-Man'], ['G', '👻 White ghost'], ['V', '👻 Purple ghost'] ];
+const ANIMS = [ ['-', 'None'], ['$', '$ Dollars'], ['~', '〰 Wave'], ['D', '🐬 Dolphin'], ['*', '✦ Sparkle'], ['>', '» Arrows'], ['g', '■ Box Man green'], ['r', '■ Box Man red'], ['y', '■ Box Man yellow'], ['b', '■ Box Man blue'], ['G', '👻 White ghost'], ['V', '👻 Purple ghost'], ['T', '🧨 TNT'], ['M', '👟 Dancing shoes'], ['H', '🔨 Hammer'], ['C', '🚪 Cabinet door'], ['L', '❤ Heart'] ];
 const GAPS = ['B', '3', '2', '1', '0'];   // slider left -> right
 const GAPNAME = { B:'Blank (scrolls fully off)', 3:'3 panels', 2:'2 panels', 1:'1 panel', 0:'No gap' };
 const stepMs = sp => sp <= 10 ? 90 - (sp - 1) * (75 / 9) : 150 / sp;   // ms per 1-dot move; 20 = twice the old top speed
@@ -282,7 +282,9 @@ BUILTIN.forEach(p => p.lines.forEach(ln => { if (isPhone(ln.text)) ln.font = 'di
 let state = fixState(structuredClone(BUILTIN[0]));
 
 const $ = id => document.getElementById(id);
-const log = t => { $('log').textContent = (t + '\n' + $('log').textContent).slice(0, 2000); };
+const log = t => { const el = $('log'); el.textContent = (el.textContent + (el.textContent ? '\n' : '') + t).slice(-3000); el.scrollTop = el.scrollHeight; };
+let rxBuf = '';
+const onReply = chunk => { rxBuf += chunk; let i; while ((i = rxBuf.indexOf('\n')) >= 0) { const line = rxBuf.slice(0, i).trim(); rxBuf = rxBuf.slice(i + 1); if (line) log(line); } };
 const hex = v => v.replace('#', '').toUpperCase();
 
 // ---------- presets ----------
@@ -583,7 +585,7 @@ function glyph(ch) {
   cols.push(Array(8).fill(false));
   return glyphCache[ch] = cols;
 }
-const ANIMW = { '$':20, '~':18, 'D':22, '*':14, '>':16, P:22, G:12, V:12 };
+const ANIMW = { '$':20, '~':18, 'D':22, '*':14, '>':16, P:22, g:22, r:22, y:22, b:22, G:12, V:12, T:14, M:16, H:14, C:12, L:10 };
 const DOLPHIN = [0b0000100000, 0b0001110000, 0b1011111110, 0b0111111111, 0b1000011000];
 function hsvToHex(hue255) {   // FastLED-style hue (0-255), full saturation
   const h = hue255 / 255 * 360, f = n => { const k = (n + h / 60) % 6; return Math.round(255 * (1 - Math.max(0, Math.min(k, 4 - k, 1)))); };
@@ -610,26 +612,59 @@ function animCols(a, now) {   // -> columns of 8 colors|null, same math as the f
       const hh = (c * 73 + r * 151 + t * 37 + c * r * 11) % 23;
       if (hh === 0) set(c, r, '#ffffff'); else if (hh === 1) set(c, r, '#c89600');
     }
-  } else if (a === 'P') {   // Pac-Man facing left, chomping toward a row of pellets
-    const open = Math.abs(Math.sin(now * 0.012)) * 0.85;
-    for (let x = 0; x < 8; x++) for (let y = 0; y < 7; y++) {
-      const dx = x - 3, dy = y - 3;
-      if (dx * dx + dy * dy > 12.5) continue;
-      if (dx < 0 && Math.abs(Math.atan2(dy, -dx)) < open) continue;   // mouth
-      set(13 + x, y, x === 3 && y === 1 ? null : '#ffe000');
+  } else if ('Pgryb'.includes(a)) {   // Box Man: square chomper with a wedge mouth, gobbling gold coins
+    const C = { g:['#30d050', '#108030'], r:['#ff3030', '#901010'], y:['#ffd820', '#a07800'], b:['#3070ff', '#1030a0'] }[a === 'P' ? 'y' : a];
+    const open = Math.floor(now / 120) % 4, o = open === 3 ? 1 : open, x0 = 13;
+    for (let x = 0; x < 8; x++) for (let y = 0; y < 8; y++) {
+      const depth = x, half = o * (4 - depth) / 4 * 1.6;
+      if (x < 5 && Math.abs(y + 0.5 - 4) < half) continue;   // mouth
+      set(x0 + x, y, x === 0 || x === 7 || y === 0 || y === 7 ? C[1] : C[0]);
     }
-    const eaten = Math.floor(now / 260) % 4;   // pellets disappear one by one as he chomps
-    for (let i = 0; i < 3; i++) if (i >= eaten) set(10 - i * 4, 3, '#ffb8a0');
-  } else if (a === 'G' || a === 'V') {   // ghost with a wavy skirt, eyes looking left
-    const body = a === 'G' ? '#f0f0ff' : '#a040ff', bob = Math.floor(now / 300) % 2, sk = Math.floor(now / 150) % 2;
-    const rows = [[2, 4], [1, 5], [0, 6], [0, 6], [0, 6], [0, 6]];
-    rows.forEach(([l, r], y) => { for (let x = l; x <= r; x++) set(3 + x, y + bob, body); });
-    for (let x = 0; x <= 6; x++) if ((x + sk) % 2 === 0) set(3 + x, 6 + bob, body);
-    [[1, 2], [4, 2]].forEach(([ex, ey]) => {
-      if (a === 'V') { set(3 + ex, ey + bob, '#ffffff'); set(4 + ex, ey + bob, '#ffffff'); set(3 + ex, ey + 1 + bob, '#ffffff'); set(4 + ex, ey + 1 + bob, '#ffffff'); }
-      set(3 + ex, ey + 1 + bob, '#2040ff');
-      if (a === 'G') set(3 + ex, ey + bob, '#2040ff');
+    set(x0 + 5, 2, '#ffffff'); set(x0 + 4, 2, '#101010');
+    const eaten = Math.floor(now / 360) % 4;
+    for (let i = 0; i < 3; i++) if (i >= eaten) { const bx = 9 - i * 4; set(bx, 3, '#fff3a0'); set(bx + 1, 3, '#ffcc30'); set(bx, 4, '#ffcc30'); set(bx + 1, 4, '#d09a10'); }
+    if (eaten && now % 360 < 200) { set(11, 1, '#fff0a0'); set(10, 0, '#fff0a0'); }
+  } else if (a === 'G' || a === 'V') {   // bedsheet ghost: rounded dome, flared sheet, rippling hem, hollow eyes
+    const body = a === 'G' ? '#f2f2f2' : '#a040ff', sway = Math.round(Math.sin(now * 0.005));
+    [[3, 6], [2, 7], [1, 8], [1, 8], [0, 9], [0, 9], [0, 9]].forEach(([l, r], y) => { for (let x = l; x <= r; x++) set(x + 1 + sway, y, body); });
+    const ph = Math.floor(now / 180) % 3;
+    for (let x = 0; x < 10; x++) if ((x + ph) % 3 !== 0) set(x + 1 + sway, 7, body);
+    set(4 + sway, 2, '#101010'); set(4 + sway, 3, '#101010'); set(7 + sway, 2, '#101010'); set(7 + sway, 3, '#101010'); set(6 + sway, 5, '#101010');
+  } else if (a === 'T') {   // mini TNT: fuse burns down, flash, repeat
+    const cyc = now % 1800, burn = Math.min(1, cyc / 1400);
+    const flash = cyc > 1400 && Math.floor(cyc / 70) % 2 === 0;
+    for (let x = 3; x < 11; x++) for (let y = 3; y < 8; y++) set(x, y, flash ? '#ffffff' : y === 5 ? '#f0f0f0' : '#d01818');
+    if (!flash) { set(4, 5, '#202020'); set(6, 5, '#202020'); set(8, 5, '#202020'); }
+    const fuse = [[7, 2], [8, 1], [9, 0]], left = Math.round((1 - burn) * 3);
+    for (let i = 0; i < left; i++) set(fuse[i][0], fuse[i][1], '#a08060');
+    if (cyc < 1400) { const sp = fuse[Math.max(0, left - 1)]; set(sp[0], sp[1] - (left ? 1 : 0), Math.floor(now / 60) % 2 ? '#ffe040' : '#ff7000'); set(sp[0] + 1, sp[1], '#ffb000'); }
+  } else if (a === 'M') {   // dancing shoes: white socks, shiny shoes, gliding backward
+    const step = Math.floor(now / 350) % 2, glide = Math.floor((now % 1400) / 1400 * 4);
+    [[2, step], [8, 1 - step]].forEach(([fx, up]) => {
+      const x = fx + glide;
+      for (let y = 0; y < 4; y++) { set(x + 1, y, '#5060a0'); set(x + 2, y, '#5060a0'); }
+      set(x + 1, 4, '#ffffff'); set(x + 2, 4, '#ffffff');
+      if (up) { set(x + 1, 5, '#ffffff'); set(x + 2, 5, '#9090a0'); set(x, 6, '#9090a0'); set(x + 1, 6, '#9090a0'); set(x, 7, '#c0c0d0'); }
+      else { for (let k = 0; k < 4; k++) set(x - 1 + k, 6, '#9090a0'); for (let k = 0; k < 4; k++) set(x - 1 + k, 7, k === 0 ? '#e0e0f0' : '#707080'); set(x + 1, 5, '#ffffff'); }
     });
+  } else if (a === 'H') {   // hammer tapping a nail in
+    const hit = Math.floor(now / 260) % 2, sink = Math.floor(now / 520) % 4;
+    for (let y = 4 + sink; y < 8; y++) set(9, y, '#b0b0b8');
+    set(8, 3 + sink, '#d0d0d8'); set(9, 3 + sink, '#d0d0d8'); set(10, 3 + sink, '#d0d0d8');
+    for (let x = 0; x < 9; x++) set(x, 7, '#8a5a2a');
+    if (hit) { for (let x = 2; x < 8; x++) set(x, 2 + sink, '#a06a30'); set(7, 1 + sink, '#909098'); set(8, 1 + sink, '#c0c0c8'); set(8, 2 + sink, '#c0c0c8'); set(7, 2 + sink, '#909098'); set(11, 1 + sink, '#ffe060'); set(11, 3 + sink, '#ffe060'); }
+    else { for (let k = 0; k < 6; k++) set(2 + k, 6 - k, '#a06a30'); set(7, 0, '#c0c0c8'); set(8, 0, '#c0c0c8'); set(8, 1, '#909098'); }
+  } else if (a === 'C') {   // cabinet door swinging open and shut
+    const sw = (Math.sin(now * 0.004) + 1) / 2, dw = Math.round(6 - sw * 5);
+    for (let x = 2; x < 10; x++) { set(x, 0, '#e0a868'); set(x, 7, '#5a3010'); }
+    for (let y = 1; y < 7; y++) { set(2, y, '#a0602a'); set(9, y, '#a0602a'); for (let x = 3; x < 9; x++) set(x, y, y === 4 ? '#c08040' : '#2a1608'); }
+    for (let x = 3; x < 3 + dw; x++) for (let y = 1; y < 7; y++) set(x, y, x === 3 + dw - 1 ? '#7a4a20' : '#b87038');
+    if (dw > 2) set(3 + dw - 2, 4, '#ffd040');
+  } else if (a === 'L') {   // pulsing heart
+    const big = Math.floor(now / 300) % 2, c = big ? '#ff2050' : '#c01038';
+    const rows = big ? ['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...'] : ['.......', '.##.##.', '.#####.', '..###..', '...#...', '.......'];
+    rows.forEach((r, y) => [...r].forEach((ch, x) => { if (ch === '#') set(1 + x, 1 + y, c); }));
+    if (big) set(2, 1, '#ffb0c0');
   } else if (a === '>') {
     const act = Math.floor(now / 150) % 3;
     for (let i = 0; i < 3; i++) {
@@ -639,7 +674,7 @@ function animCols(a, now) {   // -> columns of 8 colors|null, same math as the f
   }
   return g;
 }
-const SCENES = [ ['-', 'Off'], ['D', '🐬 Dolphin'], ['W', '🌊 Beach wave'], ['E', '👀 Purple eyes'], ['F', '🎆 Fireworks'], ['B', '💧 Bouncing drop'], ['S', '🕷 Halloween spider'], ['R', '🌧 Rain'], ['$', '$ Money rain'], ['~', '〰 Rainbow wave'], ['*', '✦ Sparkles'], ['>', '« Arrows'] ];
+const SCENES = [ ['-', 'Off'], ['D', '🐬 Dolphin'], ['W', '🌊 Beach wave'], ['E', '👀 Purple eyes'], ['F', '🎆 Fireworks'], ['B', '💧 Bouncing drop'], ['S', '🕷 Halloween spider'], ['A', '🦍 Gorilla smash'], ['X', '🧨 TNT blast'], ['K', '👟 Moonwalk'], ['N', '⭐ PSV nautical star'], ['Q', '📼 Cassette'], ['O', '🪩 Disco ball'], ['Z', '🚗 Lowrider'], ['R', '🌧 Rain'], ['$', '$ Money rain'], ['~', '🧬 DNA helix'], ['*', '✦ Sparkles'], ['>', '« Arrows'] ];
 
 // ---------- animated thumbnails ----------
 const thumbs = new Set();
@@ -722,7 +757,7 @@ function sceneBox() {
   const x0 = Math.min(...gxs) * PW, y0 = Math.min(...gys) * PH;
   return [x0, y0, (Math.max(...gxs) + 1) * PW - x0, (Math.max(...gys) + 1) * PH - y0];
 }
-const SCENE_LEN = { S:10000, D:6500, '$':4500, R:5000, E:7500, F:6500, B:6500, W:11000, '~':4500, '*':4500, '>':4500 };
+const SCENE_LEN = { S:10000, X:7000, K:7000, N:9000, Q:7500, O:6500, Z:6500, A:8500, D:6500, '$':4500, R:5000, E:7500, F:6500, B:6500, W:11000, '~':4500, '*':4500, '>':4500 };
 const sceneLen = k => SCENE_LEN[k] || 4500;
 const hsh = n => { n = (n ^ 61) ^ (n >>> 16); n = Math.imul(n, 9); n ^= n >>> 4; n = Math.imul(n, 0x27d4eb2d); return (n ^ (n >>> 15)) >>> 0; };
 function shade(hexc, f) {
@@ -1014,11 +1049,151 @@ function drawScene(fb, t, type, x0, y0, w, h, occ) {
       [[-2, -1], [-1, -2], [0, -1], [2, -1], [1, -2]].forEach(([dx, dy]) => { if (dx !== 0) set(sx + dx, sy + dy, shade('#40ff50', 0.25 + glow * 0.35)); });
       set(sx - 1, sy - 1, shade('#80ff90', 0.6 + glow * 0.4)); set(sx + 1, sy - 1, shade('#80ff90', 0.6 + glow * 0.4));
     }
-  } else if (type === '~') {   // big rainbow wave
-    for (let x = x0; x < x0 + w; x++) for (let k = 0; k < 2; k++) {
-      const yy = cy - 0.5 + (h / 2 - 2) * Math.sin(x * 0.12 + t * 0.006 + k * Math.PI);
-      const c = HUEC(130 + (x - x0) * 2 + k * 60);
-      set(x, yy, c); set(x, yy + 1, shade(c, 0.5));
+  } else if ('XKNQOZA'.includes(type)) {
+    const ease = p => p < 0 ? 0 : p > 1 ? 1 : p * p * (3 - 2 * p);
+    const art = (rows, map, ox, oy) => rows.forEach((r, y) => [...r].forEach((ch, x) => { if (map[ch]) set(ox + x, oy + y, map[ch]); }));
+    const cy = y0 + h / 2, mx = x0 + w / 2;
+    if (type === 'X') {   // blocky critter + TNT crate: fuse, flash, boom into pixel blocks
+      const cx = mx - 14, cyB = y0 + h - 10;
+      const boom = 4200, crit = ['.####.', '#e##e#', '######', '##mm##', '######', '.#..#.', '.#..#.'];
+      if (t < boom) {
+        const fl = t > 3500 && Math.floor(t / 70) % 2;
+        for (let x = 0; x < 20; x++) for (let y = 0; y < 10; y++) set(cx + x, cyB + y, fl ? '#ffffff' : y >= 1 && y <= 8 && x > 0 && x < 19 ? '#f2f2f2' : '#d82020');
+        if (!fl) {   // hand-drawn TNT letters so they stay crisp
+          const LT = { T: ['#####', '..#..', '..#..', '..#..', '..#..', '..#..'], N: ['#...#', '##..#', '#.#.#', '#..##', '#...#', '#...#'] };
+          [...'TNT'].forEach((ch, i) => art(LT[ch], { '#': '#d82020' }, cx + 1 + i * 6, cyB + 2));
+        }
+        const burn = ease((t - 2000) / 1500), fx = cx + 14, fl0 = 5;
+        const left = t < 2000 ? fl0 : Math.round(fl0 * (1 - burn));
+        for (let i = 0; i < left; i++) set(fx + Math.floor(i / 2), cyB - 1 - i, '#a08060');
+        if (t > 2000 && t < 3600) set(fx + Math.floor(left / 2), cyB - 1 - left, Math.floor(t / 60) % 2 ? '#ffe040' : '#ff6000');
+        const walk = ease(t / 2000), kx = x0 + w + 2 - walk * (x0 + w + 2 - (cx + 24)), scared = t > 3500 ? -2 : 0;
+        art(crit, { '#': '#40c040', e: '#101010', m: '#205020' }, Math.round(kx), cyB + 3 + scared + (t < 2000 && Math.floor(t / 150) % 2 ? -1 : 0));
+      } else {
+        const e = t - boom;
+        if (e < 250) for (let x = x0; x < x0 + w; x++) for (let y = y0; y < y0 + h; y++) if (Math.hypot((x - cx - 10) / 2.5, y - cyB - 5) < e / 18) set(x, y, e < 120 ? '#ffffff' : '#ffd040');
+        for (let i = 0; i < 46; i++) {   // flying pixel blocks
+          const hs = hsh(i * 97 + 5), a2 = (hs % 360) / 180 * Math.PI, sp = 0.006 + (hs >> 9) % 14 / 1000;
+          const bx = cx + 10 + Math.cos(a2) * sp * e * 1.8, by = cyB + 5 + (Math.sin(a2) * sp - 0.012) * e + 0.0000045 * e * e;
+          const col = ['#d82020', '#f2f2f2', '#40c040', '#808080', '#ffb020'][hs % 5];
+          set(bx, by, col); set(bx + 1, by, col); set(bx, by + 1, col); set(bx + 1, by + 1, col);
+        }
+        if (e > 150) for (let i = 0; i < 14; i++) { const hs = hsh(i * 31 + 7); const r = e * 0.008; set(cx + 10 + Math.cos(i) * r * 2 + hs % 3, cyB + 5 + Math.sin(i) * r - e * 0.002, shade('#808080', Math.max(0, 1 - e / 2500))); }
+      }
+    } else if (type === 'K') {   // moonwalk: looks like stepping forward (left) while gliding backward (right), spin, toe stand
+      const glideEnd = 4600, gx = x0 + 8 + ease(Math.min(t, glideEnd) / glideEnd) * (w - 30), base = y0 + h - 1;
+      const pants = '#3a4a80', sock = '#ffffff', shoe = '#a0a0b8', shine = '#e8e8ff';
+      const leg = (x, heelUp, toe) => {
+        for (let y = y0; y < base - 4; y++) { set(x, y, pants); set(x + 1, y, pants); set(x + 2, y, pants); }
+        set(x, base - 4, sock); set(x + 1, base - 4, sock); set(x + 2, base - 4, sock);
+        if (toe) { set(x + 1, base - 3, sock); set(x + 1, base - 2, shoe); set(x + 1, base - 1, shine); set(x + 2, base - 2, shoe); set(x + 2, base - 1, shoe); return; }
+        if (heelUp) { set(x, base - 3, sock); set(x + 1, base - 3, sock); for (let k = -1; k < 3; k++) set(x + k, base - 2 + (k > 0 ? 1 : 0), shoe); set(x - 2, base - 1, shoe); set(x - 1, base - 1, shine); }
+        else { for (let k = -2; k < 3; k++) { set(x + k, base - 2, shoe); set(x + k, base - 1, k === -2 ? shine : shoe); } set(x, base - 3, sock); set(x + 1, base - 3, sock); }
+      };
+      if (t < glideEnd) { const st = Math.floor(t / 420) % 2; leg(Math.round(gx), st === 0, false); leg(Math.round(gx) + 6, st === 1, false); }
+      else if (t < 5600) { const sp = Math.floor((t - glideEnd) / 110) % 4; leg(Math.round(gx) + (sp < 2 ? 0 : 6), true, false); leg(Math.round(gx) + (sp < 2 ? 6 : 0), false, false); }
+      else { leg(Math.round(gx) + 1, false, true); leg(Math.round(gx) + 5, false, true); if (Math.floor(t / 150) % 2) { set(Math.round(gx) - 3, y0 + 3, '#ffffff'); set(Math.round(gx) + 11, y0 + 5, '#ffe080'); } }
+      for (let i = 0; i < 5; i++) { const hs = hsh(i * 13 + Math.floor(t / 300)); if (hs % 4 === 0) set(x0 + hs % w, y0 + (hs >> 8) % (h - 6), '#ffffff'); }
+    } else if (type === 'N') {   // PSV nautical star bouncing off the walls, light points change color on each bounce
+      const R = Math.min(7.5, h / 2 - 0.5), spanX = w - 2 * R - 1, spanY = h - 2 * R - 1;
+      const tri = (v, span) => { const m = ((v % (2 * span)) + 2 * span) % (2 * span); return [m < span ? m : 2 * span - m, Math.floor(v / span)]; };
+      const [px, bxN] = tri(t * 0.03 + 5, spanX), [py, byN] = spanY > 0 ? tri(t * 0.011 + 1, spanY) : [0, 0];
+      const scx = x0 + R + 0.5 + px, scy = y0 + R + 0.5 + py, bounces = bxN + byN;
+      const lite = ['#ffffff', '#ffd040', '#40e0ff', '#ff60c0', '#60ff80'][bounces % 5];
+      for (let x = Math.floor(scx - R - 1); x <= scx + R + 1; x++) for (let y = Math.floor(scy - R - 1); y <= scy + R + 1; y++) {
+        const dx = x + 0.5 - scx, dy = y + 0.5 - scy, rr = Math.hypot(dx, dy); if (rr > R + 0.3) continue;
+        let ang = Math.atan2(dx, -dy); if (ang < 0) ang += Math.PI * 2;
+        const seg = ang / (Math.PI / 5), k = Math.floor(seg), f = seg - k;
+        const edge = R * (k % 2 === 0 ? (1 - f) + f * 0.48 : 0.48 * (1 - f) + f);   // star outline: point, notch, point...
+        if (rr > edge + 0.25) continue;
+        set(x, y, k % 2 === 0 ? (f < 0.5 ? lite : '#5a5a70') : (f < 0.5 ? '#5a5a70' : lite));
+      }
+    } else if (type === 'Q') {   // cassette: reels spin, then the tape spills out in loops
+      const cw = Math.min(34, w - 4), cx0 = Math.round(mx - cw / 2), ct = y0 + 1, ch = h - 2;
+      const slide = t > 6200 ? (t - 6200) * 0.06 : 0, ox = cx0 - slide;
+      for (let x = 0; x < cw; x++) for (let y = 0; y < ch; y++) {
+        const edgeP = x === 0 || x === cw - 1 || y === 0 || y === ch - 1;
+        set(ox + x, ct + y, edgeP ? '#c0c0c8' : y < 4 ? '#f0e6c0' : y < ch - 3 ? '#303038' : '#505058');
+      }
+      for (let x = 3; x < cw - 3; x++) set(ox + x, ct + 2, '#e04040');
+      [ox + 9, ox + cw - 10].forEach((rx, i) => {
+        const rot = t * 0.012 * (i ? 1 : 1.3), ry = ct + 8;
+        for (let a3 = 0; a3 < 16; a3++) set(rx + Math.cos(a3 / 16 * 6.283) * 3, ry + Math.sin(a3 / 16 * 6.283) * 3, '#8a5a30');
+        for (let k = 0; k < 3; k++) { const aa = rot + k * 2.094; set(rx + Math.cos(aa) * 1.5, ry + Math.sin(aa) * 1.5, '#ffffff'); }
+        set(rx, ry, '#c0c0c8');
+      });
+      if (t > 3000) {   // tape loops spilling out to the right
+        const len = Math.min(w, (t - 3000) * 0.035);
+        for (let i = 0; i < len; i += 0.5) { const tx2 = ox + cw - 6 + i, ty2 = ct + ch - 2 + Math.sin(i * 0.35 + t * 0.004) * 3 + Math.sin(i * 0.11) * 2; set(tx2, Math.min(y0 + h - 1, ty2), '#8a4a20'); }
+      }
+    } else if (type === 'O') {   // disco ball drops in, sprays light flecks, rises away
+      const dropIn = ease(t / 1000), up = t > 5600 ? ease((t - 5600) / 900) : 0, R = Math.min(6, h / 2 - 1.5);
+      const bcy = y0 - R - 1 + (cy - (y0 - R - 1)) * dropIn - up * (cy - y0 + R + 2);
+      for (let y = y0; y < bcy - R; y++) set(mx, y, '#909090');
+      for (let x = Math.floor(mx - R); x <= mx + R; x++) for (let y = Math.floor(bcy - R); y <= bcy + R; y++) {
+        const dx = x + 0.5 - mx, dy = y + 0.5 - bcy; if (Math.hypot(dx, dy) > R) continue;
+        const facet = (Math.floor(x + t * 0.01) + Math.floor(y)) % 3, glint = hsh(x * 7 + y * 13 + Math.floor(t / 120)) % 9 === 0;
+        set(x, y, glint ? '#ffffff' : ['#c0c0d0', '#8080a0', '#a0a0b8'][facet]);
+      }
+      if (t > 900 && t < 6000) for (let i = 0; i < 40; i++) {
+        const hs = hsh(i * 53 + 3), fxp = x0 + ((hs % 997) / 997 * w + t * 0.02 * (i % 2 ? 1 : -1) + w * 4) % w, fyp = y0 + (hs >> 10) % h;
+        if (Math.hypot(fxp - mx, fyp - bcy) > R + 1 && (hs + Math.floor(t / 90)) % 5) set(fxp, fyp, HUEC(hs % 256 + t * 0.05));
+      }
+    } else if (type === 'Z') {   // lowrider bouncing across on hydraulics, right to left
+      const L2 = 30, carX = x0 + w + 2 - (t / 6500) * (w + L2 + 6), road = y0 + h - 1;
+      const front = Math.max(0, Math.sin(t * 0.011)) * 3, rear = Math.max(0, Math.sin(t * 0.011 + Math.PI)) * 2, hop = Math.abs(Math.sin(t * 0.0055)) > 0.97 ? 2 : 0;
+      for (let x = x0; x < x0 + w; x++) if ((x + Math.floor(t / 40)) % 6 < 3) set(x, road, '#606060');
+      for (let i = 0; i < L2; i++) {
+        const lift = front + (rear - front) * (i / (L2 - 1)) + hop, x = Math.round(carX + i), yb = road - 3 - lift;
+        const roofOn = i > 8 && i < 21;
+        for (let y = 0; y < 3; y++) set(x, yb - y, y === 0 ? '#801050' : '#d01880');
+        if (i === 0) set(x, yb - 1, '#ffffa0');
+        if (i === L2 - 1) set(x, yb - 1, '#ff2020');
+        if (roofOn) { set(x, yb - 3, i === 9 || i === 20 ? '#d01880' : '#80d0ff'); set(x, yb - 4, '#d01880'); }
+        if (i % 3 === 0 && i > 2 && i < L2 - 3) set(x, yb - 2, '#ffb0e0');
+      }
+      [5, L2 - 6].forEach((wx, i) => { const x = Math.round(carX + wx), spin = Math.floor(t / 80) % 2;
+        for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1], [-1, 1], [1, -1]]) set(x + dx, road - 2 + dy, '#303030');
+        set(x, road - 2, '#d0d0d0'); set(x + (spin ? 1 : -1), road - 2 + (spin ? -1 : 1), '#d0d0d0'); });
+    } else if (type === 'A') {   // gorilla stomps in, beats chest, smashes OLD PRICE to reveal HALF PRICE
+      const F = '#9a6a40', FC = '#f0c090', D = '#201008';
+      const down = ['....####....', '...######...', '..##ffff##..', '..#feffef#..', '..#ffffff#..', '...#fmmf#...', '.##########.', '############', '##.######.##', '##.######.##', '##.######.##', '#..######..#', '...######...', '...##..##...', '...##..##...', '..###..###..'];
+      const upA = ['##..####..##', '##.######.##', '####ffff####', '.##feffef##.', '..#ffffff#..', '...#fmmf#...', '..########..', '..########..', '...######...', '...######...', '...######...', '...######...', '...######...', '...##..##...', '...##..##...', '..###..###..'];
+      const map = { '#': F, f: FC, e: D, m: D };
+      const signX = Math.round(x0 + Math.max(1, w * 0.06)), sy = Math.round(cy - 4.5), sw = 'OLD PRICE'.length * 6 + 3;
+      const SMASH = 4300;
+      if (t < SMASH + 150) {   // the old price sign
+        for (let x = 0; x < sw; x++) for (let y = 0; y < 10; y++) set(signX + x, sy + y, x === 0 || y === 0 || x === sw - 1 || y === 9 ? '#c0c0c0' : '#802020');
+        [...'OLD PRICE'].forEach((chh, i) => glyph(chh).forEach((col, c) => col.forEach((on, y) => { if (on) set(signX + 2 + i * 6 + c, sy + 1 + y, '#ffffff'); })));
+      } else {   // pieces fall, new price appears
+        const e = t - SMASH;
+        [...'OLD PRICE'].forEach((chh, i) => glyph(chh).forEach((col, c) => col.forEach((on, y) => {
+          if (!on) return; const hs = hsh(i * 17 + c * 3 + y);
+          set(signX + 2 + i * 6 + c + ((hs % 7) - 3) * e * 0.004, sy + 1 + y + 0.00004 * e * e * (1 + hs % 3), '#ff8080');
+        })));
+        if (e > 600) { const msg = 'HALF PRICE', tw2 = msg.length * 6 - 1, tx2 = signX + Math.round((sw - tw2) / 2), p = Math.min(1, (e - 600) / 500);
+          [...msg].forEach((chh, i) => glyph(chh).forEach((col, c) => col.forEach((on, y) => { if (on && (i + 1) / msg.length <= p + 0.1) set(tx2 + i * 6 + c, sy + 1 + y, Math.floor(e / 250) % 2 ? '#40ff60' : '#ffd040'); }))); }
+      }
+      const standX = signX + sw + 3, walk = ease(t / 2200), gx = Math.round(x0 + w + 2 - walk * (x0 + w + 2 - standX));
+      let pose = down, gy = y0;
+      if (t > 2400 && t < 3900) pose = Math.floor(t / 180) % 2 ? upA : down;          // chest beat
+      else if (t >= 3900 && t < SMASH) { pose = upA; gy = y0 - Math.round(3 * Math.sin((t - 3900) / (SMASH - 3900) * Math.PI)); }   // leap
+      else if (t >= SMASH + 1200) pose = upA;                                          // proud
+      if (t < 2200 && Math.floor(t / 200) % 2) gy += 1;
+      art(pose, map, gx, gy);
+      if (t > 2400 && t < 3900 && Math.floor(t / 180) % 2 === 0) { set(gx + 3, y0 + 7, '#ffe060'); set(gx + 8, y0 + 7, '#ffe060'); }
+      if (t >= SMASH && t < SMASH + 300) for (let i = 0; i < 10; i++) set(signX + sw - 2 + Math.cos(i) * (t - SMASH) * 0.03, sy + 5 + Math.sin(i) * (t - SMASH) * 0.02, '#ffffff');
+    }
+  } else if (type === '~') {   // rotating DNA double helix: front strand bright, back strand dim, colored base-pair rungs
+    const zb = {}, A = h / 2 - 2, k = 0.16, PAIRS = [['#ff4040', '#40a0ff'], ['#40ff70', '#c050ff'], ['#ffb020', '#20e0e0']];
+    const put = (x, y, c, z) => { const key = Math.floor(x) + ',' + Math.round(y); if (zb[key] === undefined || zb[key] < z) { zb[key] = z; fb[key] = c; } };
+    for (let x = x0; x < x0 + w; x++) {
+      const ph = (x - x0) * k + t * 0.004;
+      [0, 1].forEach(sn => { const a2 = ph + sn * Math.PI, z = Math.cos(a2); put(x, cy - 0.5 + A * Math.sin(a2), shade(sn ? '#ffd0a0' : '#e8f0ff', 0.35 + 0.65 * (z + 1) / 2), z); });
+      if ((x - x0) % 4 === 0) {
+        const y1 = cy - 0.5 + A * Math.sin(ph), y2 = cy - 0.5 + A * Math.sin(ph + Math.PI), [ca, cb] = PAIRS[Math.floor((x - x0) / 4) % 3], z1 = Math.cos(ph), n = Math.floor(Math.abs(y2 - y1));
+        for (let i = 1; i < n; i++) { const f = i / n; put(x, y1 + (y2 - y1) * f, shade(f < 0.5 ? ca : cb, 0.5 + 0.4 * (z1 * (1 - 2 * f) + 1) / 2), -2); }
+      }
     }
   } else if (type === '*') {   // sparkles over the whole sign
     const tt = Math.floor(t / 110);
@@ -1380,7 +1555,7 @@ async function connect() {
     sentHash = {};
     const tx = await svc.getCharacteristic(TX);
     await tx.startNotifications();
-    tx.addEventListener('characteristicvaluechanged', e => log(new TextDecoder().decode(e.target.value)));
+    tx.addEventListener('characteristicvaluechanged', e => onReply(new TextDecoder().decode(e.target.value)));
     $('status').textContent = 'Connected'; $('status').className = 'ok';
   } catch (e) { $('status').textContent = 'Error: ' + e.message; }
 }
