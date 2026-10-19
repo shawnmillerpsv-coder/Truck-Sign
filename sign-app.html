@@ -151,6 +151,14 @@
     <div class="row">
       <button class="sec" id="bm0">Static</button>
       <button class="sec" id="bm1">Scroll</button>
+      <button class="sec" id="bm2">Pages</button>
+    </div>
+    <div id="bigPageRow">
+      <label>Hold each page: <b id="bigHl" style="color:var(--blue)"></b></label>
+      <input type="range" id="bigHold" min="1" max="6" step="0.5">
+      <label>Add a page break (pick the transition to the next page)</label>
+      <div id="bigPagePick"></div>
+      <div class="hint">Each ⏭ marker starts a new page. Type <b>|</b> inside a page to split it into two lines.</div>
     </div>
     <div id="bigGapRow">
       <label>Gap between repeats: <b id="bigGl" style="color:var(--blue)"></b></label>
@@ -245,7 +253,7 @@
 const COLS = 6, ROWS = 3, PW = 32, PH = 8, MAXP = 8;
 const AD = 'WHOLESALE CABINETS {$} TOP QUALITY {$} HALF THE PRICE {$} KITCHENS & BATHS';
 const PHONE = '555-123-4567';
-const L = (scroll, text, color = '#ffffff', speed = 5, gap = '1', anim = '$', font = 'classic') => ({ scroll, speed, color, text, gap, anim, font });
+const L = (scroll, text, color = '#ffffff', speed = 5, gap = '1', anim = '$', font = 'classic') => ({ scroll, speed, color, text, gap, anim, font, pages:false, hold:2.5 });
 const BUILTIN = [
   { name:'3-3 Scrolling ad', layout:[[0,0],[1,0],[2,0],[0,1],[1,1],[2,1]], lines:[L(true, AD, '#ffa000'), L(false, PHONE), L(false, '')], bright:60 },
   { name:'3-3 Steady (driving)', layout:[[0,0],[1,0],[2,0],[0,1],[1,1],[2,1]], lines:[L(false, 'HALF PRICE CABINETS', '#ffa000'), L(false, PHONE), L(false, '')], bright:60 },
@@ -260,7 +268,7 @@ const ANIMS = [ ['-', 'None'], ['$', '$ Dollars'], ['~', '〰 Wave'], ['D', '�
 const GAPS = ['B', '3', '2', '1', '0'];   // slider left -> right
 const GAPNAME = { B:'Blank (scrolls fully off)', 3:'3 panels', 2:'2 panels', 1:'1 panel', 0:'No gap' };
 const stepMs = sp => sp <= 10 ? 90 - (sp - 1) * (75 / 9) : 150 / sp;   // ms per 1-dot move; 20 = twice the old top speed
-const BIGDEF = () => ({ on:false, text:'HALF PRICE {$} CABINETS', scroll:true, speed:5, gap:'1', anim:'$',
+const BIGDEF = () => ({ pages:false, hold:2.5, on:false, text:'HALF PRICE {$} CABINETS', scroll:true, speed:5, gap:'1', anim:'$',
                         color:'#ffa000', font:'classic', size:2, bold:true, italic:false });
 function fixState(st) {
   if (!st.scene) st.scene = { type:'D', every:2 };
@@ -275,6 +283,8 @@ function fixLine(ln) {   // upgrade presets saved by older versions
   if (ln.gap === 'W') ln.gap = '0';
   if (ln.gap === 'D' || ln.gap === undefined) { ln.gap = '1'; ln.anim = ln.anim || '$'; }
   if (ln.anim === undefined) ln.anim = '-';
+  if (ln.pages === undefined) ln.pages = false;
+  if (ln.hold === undefined) ln.hold = 2.5;
   if (ln.font === undefined) ln.font = isPhone(ln.text) ? 'digital' : 'classic';
   return ln;
 }
@@ -361,8 +371,16 @@ function renderLines() {
       <label>Text</label><input type="text" class="t" value="">
       <label>Font</label><div class="fontPick"></div>
       <div class="row">
-        <button class="sec m0 ${ln.scroll ? '' : 'on'}">Static</button>
+        <button class="sec m0 ${ln.scroll || ln.pages ? '' : 'on'}">Static</button>
         <button class="sec m1 ${ln.scroll ? 'on' : ''}">Scroll</button>
+        <button class="sec m2 ${ln.pages ? 'on' : ''}">Pages</button>
+      </div>
+      <div class="pagerow" style="display:${ln.pages ? 'block' : 'none'}">
+        <label>Hold each page: <b class="hl" style="color:var(--blue)">${ln.hold}s</b></label>
+        <input type="range" class="hs" min="1" max="6" step="0.5" value="${ln.hold}">
+        <label>Add a page break (pick the transition to the next page)</label>
+        <div class="pagePick"></div>
+        <div class="hint">Each ⏭ marker starts a new page. The last page goes back to the first.</div>
       </div>
       <div class="gaprow" style="display:${ln.scroll ? 'block' : 'none'}">
         <label>Gap between repeats: <b class="gl" style="color:var(--blue)">${GAPNAME[ln.gap]}</b></label>
@@ -383,8 +401,14 @@ function renderLines() {
     t.onfocus = () => lastBox = { el:t, ln };
     t.onkeyup = t.onclick = t.onselect = t.onblur = keep;
     t.addEventListener('input', () => { keep(); if (colorRow === r) renderChips(); });
-    c.querySelector('.m0').onclick = () => { ln.scroll = false; renderLines(); drawPreview(); };
-    c.querySelector('.m1').onclick = () => { ln.scroll = true; renderLines(); drawPreview(); };
+    c.querySelector('.m0').onclick = () => { ln.scroll = false; ln.pages = false; renderLines(); resetSim(); drawPreview(); };
+    c.querySelector('.m1').onclick = () => { ln.scroll = true; ln.pages = false; renderLines(); resetSim(); drawPreview(); };
+    c.querySelector('.m2').onclick = () => { ln.pages = true; ln.scroll = false; renderLines(); resetSim(); drawPreview(); };
+    c.querySelector('.hs').oninput = e => { ln.hold = +e.target.value; c.querySelector('.hl').textContent = ln.hold + 's'; resetSim(); drawPreview(); };
+    c.querySelector('.pagePick').appendChild(makePicker({ options: PAGE_TRANS, value: null, thumb: transThumb, label: '+ Page break',
+      onPick: k => { const p = Math.min(ln._caret ?? ln.text.length, ln.text.length);
+        ln.text = ln.text.slice(0, p) + ' {:' + k + '} ' + ln.text.slice(p); ln._caret = p + k.length + 5; t.value = ln.text;
+        if (colorRow === r) renderChips(); resetSim(); drawPreview(); } }));
     c.querySelector('.gs').oninput = e => { ln.gap = GAPS[+e.target.value]; c.querySelector('.gl').textContent = GAPNAME[ln.gap]; resetSim(); drawPreview(); };
     c.querySelector('.fontPick').appendChild(makePicker({
       options: FONTS, value: ln.font, thumb: fontThumb,
@@ -426,7 +450,8 @@ function tokenize(text) {
       const e = text.indexOf('}', i);
       if (e > 0) {
         const c = text.slice(i + 1, e);
-        if (c.length === 1 && ANIMW[c]) out.push({ anim:c });
+        if (c[0] === ':') out.push({ mark:c });
+        else if (c.length === 1 && ANIMW[c]) out.push({ anim:c });
         else if (c.length === 6) color = c.toUpperCase();
         else if (c.length === 0) color = null;
         i = e; continue;
@@ -440,6 +465,7 @@ function untokenize(toks) {
   let out = '', cur = null;
   toks.forEach(t => {
     if (t.anim) { out += '{' + t.anim + '}'; return; }
+    if (t.mark) { out += '{' + t.mark + '}'; return; }
     if (t.color !== cur) { out += t.color ? '{' + t.color + '}' : '{}'; cur = t.color; }
     out += t.ch;
   });
@@ -457,6 +483,7 @@ function chipsHtml(r) {
   const toks = tokenize(ln.text), rg = colorRow === r ? selRange() : null;
   const parts = toks.map((t, i) => {
     if (t.anim) return `<span class="ch an">${(ANIMS.find(a => a[0] === t.anim) || ['', t.anim])[1]}</span>`;
+    if (t.mark) return `<span class="ch an">⏭ ${t.mark.slice(1)}</span>`;
     const sel = rg && i >= rg[0] && i <= rg[1] ? ' sel' : '';
     if (t.ch === ' ') return `<span class="ch sp${sel}" data-r="${r}" data-i="${i}"></span>`;
     const col = t.color ? '#' + t.color : ln.color;
@@ -464,7 +491,7 @@ function chipsHtml(r) {
   });
   let html = '', word = '';
   toks.forEach((t, i) => {
-    if (t.anim || t.ch === ' ') { if (word) html += '<span class="wd">' + word + '</span>'; word = ''; html += parts[i]; }
+    if (t.anim || t.mark || t.ch === ' ') { if (word) html += '<span class="wd">' + word + '</span>'; word = ''; html += parts[i]; }
     else word += parts[i];
   });
   if (word) html += '<span class="wd">' + word + '</span>';
@@ -498,7 +525,7 @@ function renderChips() { renderColorCard(); }
 function paint(color) {
   const rg = selRange(); if (colorRow === null || !rg) return;
   const ln = getLn(colorRow), toks = tokenize(ln.text);
-  for (let i = rg[0]; i <= rg[1]; i++) if (!toks[i].anim) toks[i].color = color;
+  for (let i = rg[0]; i <= rg[1]; i++) if (!toks[i].anim && !toks[i].mark) toks[i].color = color;
   ln.text = untokenize(toks);
   selA = selB = null;
   if (colorRow === 9) $('bigText').value = ln.text;
@@ -543,16 +570,16 @@ function fontGlyph(ch, font) {
   const blank = h => Array(h).fill(false);
   if (font === 'bold') {
     const g = glyph(ch), out = [];
-    for (let x = 0; x < 6; x++) out.push(g[x].map((on, y) => on || (x > 0 && g[x - 1][y])));
+    for (let x = 0; x < g.length; x++) out.push(g[x].map((on, y) => on || (x > 0 && g[x - 1][y])));
     out.push(blank(8));
     return out;
   }
   if (font === 'italic') {   // slant the classic letters: top rows shift right
-    const g = glyph(ch), out = [...Array(g.length + 2)].map(() => Array(8).fill(false));
-    g.forEach((col, x) => col.forEach((on, y) => { if (on) out[x + Math.floor((6 - Math.min(6, y)) / 3)][y] = true; }));
+    const g = glyph(ch), out = [...Array(g.length + 1)].map(() => Array(8).fill(false));
+    g.forEach((col, x) => col.forEach((on, y) => { if (on) out[x + (y < 3 ? 1 : 0)][y] = true; }));
     return out;
   }
-  if (font === 'narrow') { const g = sampleGlyph(ch, 4, 7).map(c => [...c, false]); g.push(blank(8)); return g; }
+  if (font === 'narrow') { const g = glyph(ch); if (g.length < 6) return g; const m = (a, b2) => a.map((v, i) => v || b2[i]); return [g[0], m(g[1], g[2]), m(g[2], g[3]), g[4], blank(8)]; }
   if (font === 'tall') { const g = sampleGlyph(ch, 9, 15).map(c => [...c, false]); g.push(blank(16), blank(16)); return g; }
   if (font === 'digital') {
     if (/\d/.test(ch)) {
@@ -566,22 +593,14 @@ function fontGlyph(ch, font) {
   }
   return glyph(ch);
 }
-function glyph(ch) {
+const F57 = {"A": ".###.#...##...#######...##...##...#", "B": "####.#...##...#####.#...##...#####.", "C": ".###.#...##....#....#....#...#.###.", "D": "###..#..#.#...##...##...##..#.###..", "E": "######....#....####.#....#....#####", "F": "######....#....####.#....#....#....", "G": ".###.#...##....#.####...##...#.####", "H": "#...##...##...#######...##...##...#", "I": ".###...#....#....#....#....#...###.", "J": "..###...#....#....#....#.#..#..##..", "K": "#...##..#.#.#..##...#.#..#..#.#...#", "L": "#....#....#....#....#....#....#####", "M": "#...###.###.#.##.#.##...##...##...#", "N": "#...##...###..##.#.##..###...##...#", "O": ".###.#...##...##...##...##...#.###.", "P": "####.#...##...#####.#....#....#....", "Q": ".###.#...##...##...##.#.##..#..##.#", "R": "####.#...##...#####.#.#..#..#.#...#", "S": ".#####....#.....###.....#....#####.", "T": "#####..#....#....#....#....#....#..", "U": "#...##...##...##...##...##...#.###.", "V": "#...##...##...##...##...#.#.#...#..", "W": "#...##...##...##.#.##.#.##.#.#.#.#.", "X": "#...##...#.#.#...#...#.#.#...##...#", "Y": "#...##...#.#.#...#....#....#....#..", "Z": "#####....#...#...#...#...#....#####", "0": ".###.#...##..###.#.###..##...#.###.", "1": "..#...##....#....#....#....#...###.", "2": ".###.#...#....#...#...#...#...#####", "3": "#####...#...#.....#.....##...#.###.", "4": "...#...##..#.#.#..#.#####...#....#.", "5": "######....####.....#....##...#.###.", "6": "..##..#...#....####.#...##...#.###.", "7": "#####....#...#...#...#....#....#...", "8": ".###.#...##...#.###.#...##...#.###.", "9": ".###.#...##...#.####....#...#..##..", "!": "..#....#....#....#....#.........#..", "?": ".###.#...#....#...#...#.........#..", ".": "..........................##...##..", ",": ".....................##....#...#...", "-": "................###................", "+": ".......#....#..#####..#....#.......", "&": ".##..#..#.#.#...#...#.#.##..#..##.#", "$": "..#...#####.#...###...#.#####...#..", "'": ".##....#...#.......................", "\"": ".#.#..#.#..........................", ":": "......##...##........##...##.......", "/": ".........#...#...#...#...#.........", "#": ".#.#..#.#.#####.#.#.#####.#.#..#.#.", "@": ".###.#...#....#.##.##.#.##.#.#.###.", "%": "##...##..#...#...#...#...#..##...##", "(": "...#...#...#....#....#.....#.....#.", ")": ".#.....#.....#....#....#...#...#...", "*": ".......#..#.#.#.###.#.#.#..#.......", "=": "..........#####.....#####..........", ";": "......##...##........##....#...#...", "<": "...#...#...#...#.....#.....#.....#.", ">": ".#.....#.....#.....#...#...#...#...", "_": "..............................#####"};
+const FSMALL = {"[": ".....###.#...#...#...#...###....", "\\": "....#...#....#....#....#...#....", "]": ".....###...#...#...#...#.###....", "^": "......#..#.#....................", "`": ".....#....#.....................", "a": ".............####..##..#.###....", "b": "....#...#...###.#..##..####.....", "c": "..............##.#...#....##....", "d": ".......#...#.####..##..#.###....", "e": ".............##.#.####...##.....", "f": "......#..#.#.#..###..#...#......", "g": ".............##.#..#.###...#.##.", "h": "....#...#...###.#..##..##..#....", "i": "......#......##...#...#..###....", "j": ".......#.......#...#...#.#.#..#.", "k": "....#...#...#..####.#..##..#....", "l": ".....##...#...#...#...#..###....", "m": "............##.##.#.#.#.#.#.....", "n": "............###.#..##..##..#....", "o": ".............##.#..##..#.##.....", "p": "............###.#..####.#...#...", "q": ".............####..#.###...#...#", "r": "............#.#.##.##...#.......", "s": "..............##.##....#.##.....", "t": ".....#...#..###..#...#.#..#.....", "u": "............#..##..##..#.###....", "v": ".............#.#.#.#.#.#..#.....", "w": "............#...#.#.#.#..#.#....", "x": "............#..#.##..##.#..#....", "y": "............#..##..#.####..#.##.", "z": "............####..#..#..####....", "{": "..##.#....#.##....#..#....##....", "|": "......#...#...#...#...#...#.....", "}": "##....#..#....##.#....#.##......", "~": ".....#.##.#....................."};
+function glyph(ch) {   // fixed dot fonts: 5x7 capitals/numbers/punctuation, 4x8 lowercase; same on every phone
   if (glyphCache[ch]) return glyphCache[ch];
-  gctx.clearRect(0, 0, 50, 70);
-  gctx.fillStyle = '#fff'; gctx.font = 'bold 70px monospace'; gctx.textBaseline = 'alphabetic'; gctx.textAlign = 'center';
-  gctx.save(); gctx.scale(1.15, 1); gctx.fillText(ch, 25 / 1.15, 62); gctx.restore();
-  const d = gctx.getImageData(0, 0, 50, 70).data, cols = [];
-  for (let cx = 0; cx < 5; cx++) {
-    const col = [];
-    for (let cy = 0; cy < 8; cy++) {
-      if (cy === 7) { col.push(false); continue; }
-      let sum = 0;
-      for (let x = cx * 10; x < cx * 10 + 10; x++) for (let y = cy * 10; y < cy * 10 + 10; y++) sum += d[(y * 50 + x) * 4 + 3];
-      col.push(sum / 100 > 95);
-    }
-    cols.push(col);
-  }
+  const cols = [];
+  if (F57[ch]) { const b = F57[ch]; for (let x = 0; x < 5; x++) { const col = []; for (let y = 0; y < 8; y++) col.push(y < 7 && b[y * 5 + x] === '#'); cols.push(col); } }
+  else if (FSMALL[ch]) { const b = FSMALL[ch]; for (let x = 0; x < 4; x++) { const col = []; for (let y = 0; y < 8; y++) col.push(b[y * 4 + x] === '#'); cols.push(col); } if (cols.every(c => !c[3])) {} }
+  else for (let x = 0; x < (ch === ' ' ? 3 : 5); x++) cols.push(Array(8).fill(false));
   cols.push(Array(8).fill(false));
   return glyphCache[ch] = cols;
 }
@@ -674,7 +693,7 @@ function animCols(a, now) {   // -> columns of 8 colors|null, same math as the f
   }
   return g;
 }
-const SCENES = [ ['-', 'Off'], ['D', '🐬 Dolphin'], ['W', '🌊 Beach wave'], ['E', '👀 Purple eyes'], ['F', '🎆 Fireworks'], ['B', '💧 Bouncing drop'], ['S', '🕷 Halloween spider'], ['A', '🦍 Gorilla smash'], ['X', '🧨 TNT blast'], ['K', '👟 Moonwalk'], ['N', '⭐ PSV nautical star'], ['Q', '📼 Cassette'], ['O', '🪩 Disco ball'], ['Z', '🚗 Lowrider'], ['R', '🌧 Rain'], ['$', '$ Money rain'], ['~', '🧬 DNA helix'], ['*', '✦ Sparkles'], ['>', '« Arrows'] ];
+const SCENES = [ ['-', 'Off'], ['Y', '🏴‍☠️ Pirate flag (red / pewter)'], ['U', '🏴‍☠️ Pirate flag (creamsicle)'], ['D', '🐬 Dolphin'], ['W', '🌊 Beach wave'], ['E', '👀 Purple eyes'], ['F', '🎆 Fireworks'], ['B', '💧 Bouncing drop'], ['S', '🕷 Halloween spider'], ['A', '🦍 Gorilla smash'], ['X', '🧨 TNT blast'], ['K', '👟 Moonwalk'], ['N', '⭐ PSV nautical star'], ['Q', '📼 Cassette'], ['O', '🪩 Disco ball'], ['Z', '🚗 Lowrider'], ['R', '🌧 Rain'], ['$', '$ Money rain'], ['~', '🧬 DNA helix'], ['*', '✦ Sparkles'], ['>', '« Arrows'] ];
 
 // ---------- animated thumbnails ----------
 const thumbs = new Set();
@@ -700,7 +719,7 @@ function fontThumb(cv, k) {
 }
 function sceneThumb(cv, k, now) {
   const fb = {};
-  if (k !== '-') drawScene(fb, now % sceneLen(k), k, 0, 0, 96, 16);
+  if (k !== '-') sceneDraw(fb, now % sceneLen(k), k, 0, 0, 96, 16);
   dots(cv, 96, 16, 1.8, (x, y) => fb[x + ',' + y]);
 }
 (function tick(t) {
@@ -748,8 +767,8 @@ document.addEventListener('click', e => { if (!e.target.closest('.dd')) document
 let loopCount = 0, sceneStart = 0;
 function onWrap(r, now) {
   if (state.scene.type === '-') return;
-  if (state.big.on && state.big.scroll && state.big.text && r !== -1) return;   // tall text drives the scene timer
-  if (rowsUsed().some(i => i < r && state.lines[i].scroll && state.lines[i].text)) return;
+  if (state.big.on && (state.big.scroll || state.big.pages) && state.big.text && r !== -1) return;   // tall text drives the scene timer
+  if (rowsUsed().some(i => i < r && (state.lines[i].scroll || state.lines[i].pages) && state.lines[i].text)) return;
   if (++loopCount % state.scene.every === 0) sceneStart = now;
 }
 function sceneBox() {
@@ -757,7 +776,7 @@ function sceneBox() {
   const x0 = Math.min(...gxs) * PW, y0 = Math.min(...gys) * PH;
   return [x0, y0, (Math.max(...gxs) + 1) * PW - x0, (Math.max(...gys) + 1) * PH - y0];
 }
-const SCENE_LEN = { S:10000, X:7000, K:7000, N:9000, Q:7500, O:6500, Z:6500, A:8500, D:6500, '$':4500, R:5000, E:7500, F:6500, B:6500, W:11000, '~':4500, '*':4500, '>':4500 };
+const SCENE_LEN = { Y:9600, U:9600, S:10000, X:7000, K:7000, N:9000, Q:7500, O:6500, Z:6500, A:8500, D:6500, '$':4500, R:5000, E:7500, F:6500, B:6500, W:11000, '~':4500, '*':4500, '>':4500 };
 const sceneLen = k => SCENE_LEN[k] || 4500;
 const hsh = n => { n = (n ^ 61) ^ (n >>> 16); n = Math.imul(n, 9); n ^= n >>> 4; n = Math.imul(n, 0x27d4eb2d); return (n ^ (n >>> 15)) >>> 0; };
 function shade(hexc, f) {
@@ -782,6 +801,11 @@ function dolphinShape(c) {   // facing left, centered on its body, ~36 dots long
   c.fillStyle = '#cfe2f4';
   c.beginPath(); c.moveTo(-16, 1); c.quadraticCurveTo(-4, 4.4, 9, 1.8); c.quadraticCurveTo(-4, 1.6, -16, 1); c.fill();
   c.fillStyle = '#05080c'; c.fillRect(-12.5, -2.2, 1.2, 1.2);
+}
+function sceneDraw(fb, t, type, x0, y0, w, h, occ) {   // draw a scene with a soft fade in and fade out
+  drawScene(fb, t, type, x0, y0, w, h, occ);
+  const L = sceneLen(type), f = Math.max(0, Math.min(1, t / 250, (L - t) / 350));
+  if (f < 1) for (const key in fb) fb[key] = shade(fb[key], f);
 }
 function drawScene(fb, t, type, x0, y0, w, h, occ) {
   occ = occ || ((x, y) => x >= x0 && x < x0 + w && y >= y0 && y < y0 + h);
@@ -870,6 +894,7 @@ function drawScene(fb, t, type, x0, y0, w, h, occ) {
         for (let i = 0; i < n; i++) {
           const a = i / n * Math.PI * 2, sp = 0.016 * (0.75 + ((hs >> i) & 3) * 0.12);
           const px2 = bx + Math.cos(a) * sp * e, py = peak + Math.sin(a) * sp * e * 0.75 + 0.000006 * e * e;
+          for (const [lag, dim] of [[140, 0.18], [70, 0.4]]) { const e2 = Math.max(0, e - lag); set(bx + Math.cos(a) * sp * e2, peak + Math.sin(a) * sp * e2 * 0.75 + 0.000006 * e2 * e2, shade(col, (f + 0.15) * dim)); }
           set(px2, py, (e > 900 && (i + Math.floor(e / 90)) % 3 === 0) ? shade('#ffffff', f) : shade(col, f + 0.15));
         }
         if (e < 120) set(bx, peak, '#ffffff');
@@ -1100,13 +1125,18 @@ function drawScene(fb, t, type, x0, y0, w, h, occ) {
       const [px, bxN] = tri(t * 0.03 + 5, spanX), [py, byN] = spanY > 0 ? tri(t * 0.011 + 1, spanY) : [0, 0];
       const scx = x0 + R + 0.5 + px, scy = y0 + R + 0.5 + py, bounces = bxN + byN;
       const lite = ['#ffffff', '#ffd040', '#40e0ff', '#ff60c0', '#60ff80'][bounces % 5];
-      for (let x = Math.floor(scx - R - 1); x <= scx + R + 1; x++) for (let y = Math.floor(scy - R - 1); y <= scy + R + 1; y++) {
-        const dx = x + 0.5 - scx, dy = y + 0.5 - scy, rr = Math.hypot(dx, dy); if (rr > R + 0.3) continue;
+      const starAt = (px, py) => {
+        const dx = px - scx, dy = py - scy, rr = Math.hypot(dx, dy); if (rr > R + 0.3) return null;
         let ang = Math.atan2(dx, -dy); if (ang < 0) ang += Math.PI * 2;
         const seg = ang / (Math.PI / 5), k = Math.floor(seg), f = seg - k;
-        const edge = R * (k % 2 === 0 ? (1 - f) + f * 0.48 : 0.48 * (1 - f) + f);   // star outline: point, notch, point...
-        if (rr > edge + 0.25) continue;
-        set(x, y, k % 2 === 0 ? (f < 0.5 ? lite : '#5a5a70') : (f < 0.5 ? '#5a5a70' : lite));
+        const edge = R * (k % 2 === 0 ? (1 - f) + f * 0.48 : 0.48 * (1 - f) + f);
+        if (rr > edge) return null;
+        return k % 2 === 0 ? (f < 0.5 ? lite : '#5a5a70') : (f < 0.5 ? '#5a5a70' : lite);
+      };
+      for (let x = Math.floor(scx - R - 1); x <= scx + R + 1; x++) for (let y = Math.floor(scy - R - 1); y <= scy + R + 1; y++) {
+        let acc = [0, 0, 0];
+        for (const sx of [1 / 6, 0.5, 5 / 6]) for (const sy of [1 / 6, 0.5, 5 / 6]) { const c = starAt(x + sx, y + sy); if (c) { const v = hexRgb(c); acc = acc.map((a, i) => a + v[i]); } }
+        if (acc[0] + acc[1] + acc[2] > 60) set(x, y, rgbHex(acc.map(a => a / 9)));
       }
     } else if (type === 'Q') {   // cassette: reels spin, then the tape spills out in loops
       const cw = Math.min(34, w - 4), cx0 = Math.round(mx - cw / 2), ct = y0 + 1, ch = h - 2;
@@ -1184,6 +1214,47 @@ function drawScene(fb, t, type, x0, y0, w, h, occ) {
       if (t > 2400 && t < 3900 && Math.floor(t / 180) % 2 === 0) { set(gx + 3, y0 + 7, '#ffe060'); set(gx + 8, y0 + 7, '#ffe060'); }
       if (t >= SMASH && t < SMASH + 300) for (let i = 0; i < 10; i++) set(signX + sw - 2 + Math.cos(i) * (t - SMASH) * 0.03, sy + 5 + Math.sin(i) * (t - SMASH) * 0.02, '#ffffff');
     }
+  } else if (type === 'Y' || type === 'U') {   // pirate flag: colors slide in, slash opens, halves part to reveal a waving flag, skull fades in, eyes turn red
+    const COLA = type === 'Y' ? [208, 16, 32] : [255, 118, 20], COLB = type === 'Y' ? [122, 128, 136] : [240, 240, 236];
+    const eO = p => { p = Math.max(0, Math.min(1, p)); return 1 - (1 - p) ** 3; }, eI = p => { p = Math.max(0, Math.min(1, p)); return p ** 3; }, eS = easeIO;
+    const slideIn = eO(t / 1100), stripe = eS((t - 1100) / 450);
+    const doorsO = t < 8600 ? eI((t - 1700) / 900) : 1 - eO((t - 8600) / 900);
+    const grow = eO((t - 1900) / 1100), skull = eS((t - 3100) / 1200), redEyes = t > 6400;
+    const k = (1 - slideIn) * 1.3 + doorsO * 1.3, xt = 0.65 * w, xb = 0.35 * w, dxl = xb - xt;
+    const side = (x, y) => x - (xt + dxl * y / h);
+    const bgAt = (px, py) => {
+      const rx = px + dxl * k, ry = py + h * k, qx = px - dxl * k, qy = py - h * k;
+      if (ry >= 0 && ry < h && side(rx, ry) > 0 && Math.abs(side(rx, ry)) > 3.4 * stripe) return COLA;
+      if (qy >= 0 && qy < h && side(qx, qy) < 0 && Math.abs(side(qx, qy)) > 3.4 * stripe) return COLB;
+      return null;
+    };
+    const ph = x => x * 0.16 - t * 0.006;
+    const flagAt = (px, py) => {
+      if (Math.abs(px - w / 2) > w / 2 * grow) return null;
+      const top = 0.6 + 0.9 * Math.sin(ph(px)), bot = h - 0.6 + 0.9 * Math.sin(ph(px) + 0.5);
+      if (py < top || py > bot) return null;
+      const edge = Math.min(py - top, bot - py) < 0.9, sheen = 0.10 + 0.16 * Math.max(0, Math.cos(ph(px))) ** 3;
+      const v = 255 * (edge ? 0.30 : sheen); return [v, v, v * 1.12];
+    };
+    for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) {
+      let r = 0, g = 0, b = 0;
+      for (const sx of [1 / 6, 0.5, 5 / 6]) for (const sy of [1 / 6, 0.5, 5 / 6]) { const c = bgAt(x + sx, y + sy) || flagAt(x + sx, y + sy); if (c) { r += c[0]; g += c[1]; b += c[2]; } }
+      if (r + g + b > 100) set(x0 + x, y0 + y, rgbHex([r / 9, g / 9, b / 9]));
+    }
+    if (skull > 0 && grow > 0.95) {
+      const SK = ['...#####...', '..#######..', '.#########.', '.##..#..##.', '.##..#..##.', '.#########.', '..###.###..', '...#####...', '...#.#.#...'];
+      const BN = ['##.........##', '.##.......##.', '..#.......#..', '.............', '.............', '.............', '.............', '..#.......#..', '.##.......##.', '##.........##'];
+      const ox = Math.round(w / 2 - 6), oy = Math.round(h / 2 - 5), wv = x => Math.round(0.5 * Math.sin(ph(x)));
+      const covered = (x, y) => doorsO < 0.999 && bgAt(x + 0.5, y + 0.5);
+      [[BN, 0], [SK, 1]].forEach(([art, dx]) => art.forEach((row, rr) => [...row].forEach((ch, cc) => {
+        const x = ox + cc + dx, y = oy + rr + wv(x); if (ch !== '#' || y < 0 || y >= h || covered(x, y)) return;
+        const under = fb[(x0 + x) + ',' + (y0 + y)] || '#000000'; set(x0 + x, y0 + y, mixHex(under, '#f4f4f4', skull));
+      })));
+      if (redEyes) {
+        const glow = 0.6 + 0.4 * Math.sin((t - 6400) * 0.012);
+        [[3, 3], [4, 3], [3, 4], [4, 4], [6, 3], [7, 3], [6, 4], [7, 4]].forEach(([cc, rr]) => { const x = ox + 1 + cc, y = oy + rr + wv(x); set(x0 + x, y0 + y, mixHex('#3c0000', '#ff1414', glow)); });
+      }
+    }
   } else if (type === '~') {   // rotating DNA double helix: front strand bright, back strand dim, colored base-pair rungs
     const zb = {}, A = h / 2 - 2, k = 0.16, PAIRS = [['#ff4040', '#40a0ff'], ['#40ff70', '#c050ff'], ['#ffb020', '#20e0e0']];
     const put = (x, y, c, z) => { const key = Math.floor(x) + ',' + Math.round(y); if (zb[key] === undefined || zb[key] < z) { zb[key] = z; fb[key] = c; } };
@@ -1253,6 +1324,17 @@ const BIGFONTS = [   // [key, name, font family, width squeeze, weight]
 const BIGSIZES = [ [8, 'Small (8 dots)'], [12, 'Medium (12 dots)'], [16, 'Full height (16 dots)'] ];
 const bigCv = document.createElement('canvas'), bctx = bigCv.getContext('2d', { willReadFrequently:true });
 const bigCache = {};
+const capCache = {};
+function capMetrics(fam, weight) {   // measure cap height and baseline of a font: ratios of the font size
+  const key = fam + weight; if (capCache[key]) return capCache[key];
+  const c = document.createElement('canvas'), x = c.getContext('2d', { willReadFrequently:true }), FS = 200;
+  c.width = 900; c.height = 400; x.font = `${weight} ${FS}px ${fam}`; x.textBaseline = 'alphabetic'; x.fillStyle = '#fff';
+  x.fillText('HIEBTX', 10, 300);
+  const d = x.getImageData(0, 0, 900, 400).data; let top = -1, bot = -1;
+  for (let y = 0; y < 400; y++) { let ink = false; for (let xx = 0; xx < 900; xx += 2) if (d[(y * 900 + xx) * 4 + 3] > 128) { ink = true; break; } if (ink) { if (top < 0) top = y; bot = y + 1; } }
+  const r = top < 0 ? { cap:0.72, base:0 } : { cap:(bot - top) / FS, base:(bot - 300) / FS };
+  return capCache[key] = r;
+}
 function bigGlyph(ch, b) {   // -> columns of h booleans
   const h = BIGSIZES[b.size][0], key = [ch, b.font, h, b.bold, b.italic].join('|');
   if (bigCache[key]) return bigCache[key];
@@ -1273,14 +1355,17 @@ function bigGlyph(ch, b) {   // -> columns of h booleans
     out = [...Array(Math.max(2, Math.round(h * (b.font === 'tall' ? 0.2 : 0.33))))].map(blank);
   } else {
     const S = 10, px = h * S, lean = b.italic ? 0.24 : 0;
-    bigCv.width = px * 2; bigCv.height = px;
+    const weight = b.bold ? Math.min(900, F[4] + 200) : F[4];
+    const m = capMetrics(F[2], weight);   // where this font's capital letters really sit
+    const size = px / m.cap, base = px + 0.4 - m.base * size;   // cap tops on the top row, baselines on the bottom row
+    bigCv.width = px * 3; bigCv.height = px;
     bctx.setTransform(1, 0, 0, 1, 0, 0); bctx.clearRect(0, 0, bigCv.width, px);
-    bctx.font = `${b.bold ? Math.min(900, F[4] + 200) : F[4]} ${px * 1.18}px ${F[2]}`;
+    bctx.font = `${weight} ${size}px ${F[2]}`;
     bctx.textBaseline = 'alphabetic'; bctx.fillStyle = '#fff';
     const mw = bctx.measureText(ch).width * F[3];
     bctx.setTransform(F[3], 0, -lean, 1, px * lean, 0);   // squeeze + italic slant
-    bctx.fillText(ch, 0, px * 0.9);
-    if (b.bold) bctx.fillText(ch, S * 0.6 / F[3], px * 0.9);
+    bctx.fillText(ch, 0, base);
+    if (b.bold) bctx.fillText(ch, S * 0.6 / F[3], base);
     bctx.setTransform(1, 0, 0, 1, 0, 0);
     const cols = Math.max(1, Math.ceil((mw + px * lean + (b.bold ? S : 0)) / S));
     const d = bctx.getImageData(0, 0, bigCv.width, px).data;
@@ -1290,7 +1375,7 @@ function bigGlyph(ch, b) {   // -> columns of h booleans
       for (let cy = 0; cy < h; cy++) {
         let sum = 0;
         for (let x = cx * S; x < cx * S + S; x++) for (let y = cy * S; y < cy * S + S; y++) sum += d[(y * bigCv.width + x) * 4 + 3];
-        col.push(sum / (S * S) > 100);
+        col.push(sum / (S * S) > 80);
       }
       out.push(col);
     }
@@ -1320,6 +1405,99 @@ function bigRaster(b, now) {   // -> columns of 16 colors|null
   }
   return out;
 }
+// ---------- Pages mode: text in pages that change with a transition (like stadium boards) ----------
+const PAGE_TRANS = [['fade', 'Fade'], ['doors', 'Red / pewter doors'], ['slide', 'Slide up'], ['left', 'Push left'], ['dissolve', 'Pixel dissolve'], ['shine', 'Shine']];
+const TRANS_MS = { fade:700, doors:1300, slide:650, left:650, dissolve:900, shine:250 };
+const PAGE_STEP = 40;
+const hexRgb = c => { const v = parseInt(c.slice(1), 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
+const rgbHex = a => '#' + a.map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+const mixHex = (a, b, f) => { const A = hexRgb(a), B = hexRgb(b); return rgbHex(A.map((v, i) => v + (B[i] - v) * f)); };
+const easeIO = p => { p = Math.max(0, Math.min(1, p)); return p * p * (3 - 2 * p); };
+function parsePages(text) {
+  const parts = text.split(/\{:(\w+)\}/), pages = [];
+  for (let i = 0; i < parts.length; i += 2) {
+    const t = parts[i].trim(), tr = parts[i + 1];
+    if (t) pages.push({ text:t, trans: tr || 'fade' });
+    else if (tr && pages.length) pages[pages.length - 1].trans = tr;
+  }
+  return pages;
+}
+function pagesInfo(src) {
+  const pages = parsePages(src.text || ''), hold = (src.hold || 2.5) * 1000;
+  let total = 0;
+  const seg = pages.map(p => { const sg = { start: total, hold, trans: p.trans, tlen: TRANS_MS[p.trans] || 700 }; total += hold + sg.tlen; return sg; });
+  return { pages, seg, total: Math.max(total, 1) };
+}
+const blankGrid = (W, H) => [...Array(W)].map(() => Array(H).fill(null));
+function pageGrid(src, txt, W, H, t) {   // one page, centered, as W columns of H colors
+  const g = blankGrid(W, H);
+  const place = (cols, y0) => { const x0 = Math.floor((W - cols.length) / 2); cols.forEach((col, i) => col.forEach((c, y) => { const x = x0 + i; if (c && x >= 0 && x < W && y0 + y >= 0 && y0 + y < H) g[x][y0 + y] = c; })); };
+  const lines = txt.split('|').map(x => x.trim()).filter(Boolean);
+  if (src.kind === 'big') {
+    if (lines.length > 1) { const f = src.bold ? 'bold' : 'classic'; place(raster(lines[0], src.color, t, f), 0); place(raster(lines[1], src.color, t, f), 8); }
+    else {   // one line: use the chosen size, step down until it fits the sign
+      let cols = null;
+      for (let sz = src.size; sz >= 0 && (!cols || cols.length > W); sz--) cols = bigRaster({ ...src, size: sz, text: lines[0] || '' }, t);
+      if (cols.length > W) cols = bigRaster({ ...src, size: 0, font: 'narrow', text: lines[0] || '' }, t);
+      if (cols.length > W) { place(raster(lines[0] || '', src.color, t, 'narrow'), 4); return g; }
+      place(cols, 0);
+    }
+  } else place(raster(lines.join(' '), src.color, t, src.font), 0);
+  return g;
+}
+const mapGrid = (g, fn) => g.map((col, x) => col.map((c, y) => fn(c, x, y)));
+function doorsGrid(W, H, k, colA = '#d01020', colB = '#7a8088') {   // red/pewter pieces along the diagonal; k 0 = closed, 1.3 = open
+  const g = blankGrid(W, H), xt = 0.65 * W, xb = 0.35 * W, dx = xb - xt, A = hexRgb(colA), B = hexRgb(colB);
+  const side = (x, y) => x - (xt + dx * y / H);
+  for (let x = 0; x < W; x++) for (let y = 0; y < H; y++) {
+    let r = 0, gg = 0, bb = 0, n = 0;
+    for (const sx of [0.25, 0.75]) for (const sy of [0.25, 0.75]) {
+      const px = x + sx, py = y + sy, rx = px + dx * k, ry = py + H * k, qx = px - dx * k, qy = py - H * k; n++;
+      const c = (ry >= 0 && ry < H && side(rx, ry) > 1.7) ? A : (qy >= 0 && qy < H && side(qx, qy) < -1.7) ? B : null;
+      if (c) { r += c[0]; gg += c[1]; bb += c[2]; }
+    }
+    if (r + gg + bb > 0) g[x][y] = rgbHex([r / n, gg / n, bb / n]);
+    else if (k < 0.35 && Math.abs(side(x + 0.5, y + 0.5)) < 2.2) g[x][y] = '#000000';   // keep the slash solid black while closed
+  }
+  return g;
+}
+function transition(kind, A, B, f, W, H) {
+  const e = easeIO(f);
+  if (kind === 'slide') { const d = Math.round(e * H); return mapGrid(A, (c, x, y) => { const ya = y + d, yb = y + d - H; return ya < H ? A[x][ya] : (yb >= 0 ? B[x][yb] : null); }); }
+  if (kind === 'left') { const d = Math.round(e * W); return mapGrid(A, (c, x, y) => { const xa = x + d, xb = x + d - W; return xa < W ? A[xa][y] : (xb >= 0 ? B[xb][y] : null); }); }
+  if (kind === 'dissolve') return mapGrid(A, (c, x, y) => (hsh(x * 31 + y * 17 + 5) % 1000) / 1000 < e ? B[x][y] : c);
+  if (kind === 'doors') {
+    const closing = f < 0.45, k = closing ? 1.3 * (1 - easeIO(f / 0.45)) : f < 0.55 ? 0 : 1.3 * easeIO((f - 0.55) / 0.45);
+    const D = doorsGrid(W, H, k), base = f < 0.5 ? A : B;
+    return mapGrid(base, (c, x, y) => D[x][y] || c);
+  }
+  // fade (and the quick crossfade before a shine)
+  return f < 0.5 ? mapGrid(A, c => c && shade(c, 1 - easeIO(f * 2))) : mapGrid(B, c => c && shade(c, easeIO(f * 2 - 1)));
+}
+function shineGrid(g, local, W, H) {   // a light glint sweeps across the letters
+  const band = -6 + Math.min(1, local / 1100) * (W + 12);
+  return mapGrid(g, (c, x, y) => { if (!c) return c; const d = Math.abs(x - band - (y - H / 2) * 0.5); return d < 2.6 ? mixHex(c, '#ffffff', 1 - d / 2.6) : c; });
+}
+function pagesFrame(src, W, H, t) {
+  const { pages, seg, total } = pagesInfo(src);
+  if (!pages.length) return blankGrid(W, H);
+  const tt = ((t % total) + total) % total;
+  let i = seg.findIndex(sg => tt < sg.start + sg.hold + sg.tlen); if (i < 0) i = seg.length - 1;
+  const sg = seg[i], j = (i + 1) % pages.length, local = tt - sg.start;
+  const A = pageGrid(src, pages[i].text, W, H, tt);
+  if (local < sg.hold) {
+    const enteredBy = seg[(i - 1 + seg.length) % seg.length].trans;
+    if (enteredBy === 'shine') return shineGrid(A, local, W, H);
+    return A;
+  }
+  return transition(sg.trans, A, pageGrid(src, pages[j].text, W, H, tt), (local - sg.hold) / sg.tlen, W, H);
+}
+function transThumb(cv, k, now) {
+  const W = 20, H = 8, mk = (ch, col) => { const g = blankGrid(W, H); const gl = glyph(ch); gl.forEach((c, i) => c.forEach((on, y) => { if (on) { g[6 + i][y] = col; g[7 + i][y] = col; } })); return g; };
+  const f = Math.min(1, ((now % 1800) / 1800) * 1.4), out = k === 'shine' ? shineGrid(mk('A', '#ffa000'), now % 1200, W, H) : transition(k, mk('A', '#ffa000'), mk('B', '#ffffff'), f, W, H);
+  dots(cv, W, H, 3, (x, y) => out[x][y]);
+}
+let pageStart = 0, pageLoops = {};
 let bigOff, bigLast = 0, bigFrame = null;
 function drawBig(fb, now) {
   const b = state.big; if (!b.text) return;
@@ -1329,6 +1507,12 @@ function drawBig(fb, now) {
   if (e === 0) return;
   const W = e - a, cols = bigRaster(b, now), tw = cols.length;
   const put = (cs, x) => cs.forEach((col, i) => col.forEach((c, y) => { if (c) fb[(x + i) + ',' + y] = c; }));
+  if (b.pages) {
+    const tp = playing ? now - pageStart : 400, g = pagesFrame({ ...b, kind:'big' }, W, 16, tp);
+    g.forEach((col, x) => col.forEach((c, y) => { if (c) fb[(a + x) + ',' + y] = c; }));
+    if (playing) { const lp = Math.floor(tp / pagesInfo(b).total); if (lp > (pageLoops.big || 0)) { pageLoops.big = lp; onWrap(-1, now); } }
+    return;
+  }
   if (!b.scroll) { put(cols, a + Math.max(0, Math.floor((W - tw) / 2))); return; }
   const aw = ANIMW[b.anim] || 0;
   let gapPx = 0;
@@ -1356,7 +1540,7 @@ function rowSpan(r) {
   const xs = state.layout.filter(p => p[1] === r).map(p => p[0]);
   return [Math.min(...xs) * PW, (Math.max(...xs) + 1) * PW];
 }
-function resetSim() { bigOff = undefined; bigLast = 0; loopCount = 0; sceneStart = 0; offsets = []; holds = []; rowsUsed().forEach(r => { const [a, b] = rowSpan(r); offsets[r] = playing ? b - a : 0; holds[r] = 0; lastStep[r] = 0; }); }
+function resetSim() { pageStart = performance.now(); pageLoops = {}; bigOff = undefined; bigLast = 0; loopCount = 0; sceneStart = 0; offsets = []; holds = []; rowsUsed().forEach(r => { const [a, b] = rowSpan(r); offsets[r] = playing ? b - a : 0; holds[r] = 0; lastStep[r] = 0; }); }
 
 function drawPreview(now = performance.now()) {
   const S = 10, used = rowsUsed();
@@ -1369,7 +1553,7 @@ function drawPreview(now = performance.now()) {
   const ox = mx * PW * S, oy = my * PH * S;
   const fb = {};
   const inScene = playing && sceneStart && state.scene.type !== '-' && now - sceneStart < sceneLen(state.scene.type);
-  if (inScene) drawScene(fb, now - sceneStart, state.scene.type, ...sceneBox(), (x, y) => occupied.has(Math.floor(x / PW) + ',' + Math.floor(y / PH)));
+  if (inScene) sceneDraw(fb, now - sceneStart, state.scene.type, ...sceneBox(), (x, y) => occupied.has(Math.floor(x / PW) + ',' + Math.floor(y / PH)));
   else if (sceneStart) { sceneStart = 0; used.forEach(r => lastStep[r] = now); }
   const covered = coveredRows();
   if (!inScene) used.forEach(r => {
@@ -1380,6 +1564,12 @@ function drawPreview(now = performance.now()) {
     const W = b - a, cols = raster(ln.text, ln.color, now, ln.font), tw = cols.length;
     const put = (cs, x, dy = 0) => cs.forEach((col, i) => col.forEach((c, y) => {
       if (c && y + dy < H) fb[(x + i) + ',' + (r * PH + y + dy)] = c; }));
+    if (ln.pages) {
+      const tp = playing ? now - pageStart : 400, g = pagesFrame({ ...ln, kind:'line' }, W, 8, tp);
+      g.forEach((col, x) => col.forEach((c, y) => { if (c) fb[(a + x) + ',' + (r * PH + y)] = c; }));
+      if (playing) { const lp = Math.floor(tp / pagesInfo(ln).total); if (lp > (pageLoops[r] || 0)) { pageLoops[r] = lp; onWrap(r, now); } }
+      return;
+    }
     if (!ln.scroll) { put(cols, a + Math.max(0, Math.floor((W - tw) / 2))); return; }
     const aw = ANIMW[ln.anim] || 0;
     let gapPx = 0;
@@ -1473,7 +1663,11 @@ function renderBig() {
   const b = state.big;
   $('bigOn').checked = b.on; $('bigBody').hidden = !b.on;
   $('bigText').value = b.text;
-  $('bm0').className = 'sec' + (b.scroll ? '' : ' on'); $('bm1').className = 'sec' + (b.scroll ? ' on' : '');
+  $('bm0').className = 'sec' + (b.scroll || b.pages ? '' : ' on'); $('bm1').className = 'sec' + (b.scroll ? ' on' : ''); $('bm2').className = 'sec' + (b.pages ? ' on' : '');
+  $('bigPageRow').style.display = b.pages ? 'block' : 'none'; $('bigHold').value = b.hold; $('bigHl').textContent = b.hold + 's';
+  $('bigPagePick').innerHTML = '';
+  $('bigPagePick').appendChild(makePicker({ options: PAGE_TRANS, value: null, thumb: transThumb, label: '+ Page break',
+    onPick: k => { const p = Math.min(b._caret ?? b.text.length, b.text.length); b.text = b.text.slice(0, p) + ' {:' + k + '} ' + b.text.slice(p); b._caret = p + k.length + 5; $('bigText').value = b.text; renderBigChips(); resetSim(); drawPreview(); } }));
   $('bigGapRow').style.display = b.scroll ? 'block' : 'none';
   $('bigGap').value = GAPS.indexOf(b.gap); $('bigGl').textContent = GAPNAME[b.gap];
   $('bigSpeed').value = b.speed; $('bigSv').textContent = b.speed;
@@ -1513,8 +1707,10 @@ function pickBig(c) {   // letters selected -> color just those, otherwise the w
 $('bigOn').onchange = e => { state.big.on = e.target.checked; renderBig(); renderLines(); resetSim(); drawPreview(); };
 $('bigText').oninput = e => { state.big.text = e.target.value; state.big._caret = e.target.selectionStart; renderBigChips(); drawPreview(); };
 $('bigText').onkeyup = $('bigText').onclick = $('bigText').onblur = e => { state.big._caret = e.target.selectionStart; };
-$('bm0').onclick = () => { state.big.scroll = false; renderBig(); resetSim(); drawPreview(); };
-$('bm1').onclick = () => { state.big.scroll = true; renderBig(); resetSim(); drawPreview(); };
+$('bm0').onclick = () => { state.big.scroll = false; state.big.pages = false; renderBig(); resetSim(); drawPreview(); };
+$('bm1').onclick = () => { state.big.scroll = true; state.big.pages = false; renderBig(); resetSim(); drawPreview(); };
+$('bm2').onclick = () => { state.big.pages = true; state.big.scroll = false; renderBig(); resetSim(); drawPreview(); };
+$('bigHold').oninput = e => { state.big.hold = +e.target.value; $('bigHl').textContent = state.big.hold + 's'; resetSim(); drawPreview(); };
 $('bigGap').oninput = e => { state.big.gap = GAPS[+e.target.value]; $('bigGl').textContent = GAPNAME[state.big.gap]; resetSim(); drawPreview(); };
 $('bigSpeed').oninput = e => { state.big.speed = +e.target.value; $('bigSv').textContent = state.big.speed; };
 $('bigSize').oninput = e => { state.big.size = +e.target.value; $('bigSzl').textContent = BIGSIZES[state.big.size][1]; resetSim(); drawPreview(); };
@@ -1617,6 +1813,7 @@ function encodeClip(frames, ms) {   // frames: [{w,h,px:[color|null]}] -> Uint8A
 }
 function lineClip(r) {
   const ln = state.lines[r], W = rowWidth([r]);
+  if (ln.pages) { const src = { ...ln, kind:'line' }, fr = []; for (let t = 0; t < pagesInfo(src).total; t += PAGE_STEP) fr.push(colsToFrame(pagesFrame(src, W, 8, t), 8)); return encodeClip(fr, PAGE_STEP); }
   const animated = hasAnimCode(ln.text) || (ln.scroll && ln.gap !== 'B' && ln.anim !== '-');
   const n = animated ? CLIP_FRAMES : 1, frames = [];
   for (let i = 0; i < n; i++) { const t = i * CLIP_MS; frames.push(colsToFrame(cycleCols(raster(ln.text, ln.color, t, ln.font), 8, W, ln.scroll, ln.gap, ln.anim, t), 8)); }
@@ -1624,6 +1821,7 @@ function lineClip(r) {
 }
 function bigClip() {
   const b = state.big, W = rowWidth([0, 1]);
+  if (b.pages) { const src = { ...b, kind:'big' }, fr = []; for (let t = 0; t < pagesInfo(src).total; t += PAGE_STEP) fr.push(colsToFrame(pagesFrame(src, W, 16, t), 16)); return encodeClip(fr, PAGE_STEP); }
   const animated = hasAnimCode(b.text) || (b.scroll && b.gap !== 'B' && b.anim !== '-');
   const n = animated ? CLIP_FRAMES : 1, frames = [];
   for (let i = 0; i < n; i++) { const t = i * CLIP_MS; frames.push(colsToFrame(cycleCols(bigRaster(b, t), 16, W, b.scroll, b.gap, b.anim, t), 16)); }
@@ -1635,7 +1833,7 @@ function sceneClip() {
   const occ = (x, y) => occupied.has(Math.floor(x / PW) + ',' + Math.floor(y / PH));
   const frames = [];
   for (let t = 0; t < L; t += SCENE_STEP) {
-    const fb = {}; drawScene(fb, t, type, x0, y0, w, h, occ);
+    const fb = {}; sceneDraw(fb, t, type, x0, y0, w, h, occ);
     const px = [];
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) px.push(fb[(x0 + x) + ',' + (y0 + y)] || null);
     frames.push({ w, h, px });
@@ -1674,11 +1872,11 @@ $('send').onclick = async () => {
       const ln = state.lines[r], on = used.includes(r) && !!ln.text && !(state.big.on && r < 2);
       if (on) files.push(['l' + r, lineClip(r)]);
       const hold = on && ln.scroll && ln.gap === 'B' && ln.font === 'digital' ? 40 : 0;
-      cmds.push(`LINE:${r},${on ? 1 : 0},${ln.scroll ? 'S' : 'T'},${stepMs(ln.speed).toFixed(1)},${hold}`);
+      cmds.push(`LINE:${r},${on ? 1 : 0},${ln.pages ? 'P' : ln.scroll ? 'S' : 'T'},${stepMs(ln.speed).toFixed(1)},${hold}`);
     }
     const b = state.big, bigOn = b.on && !!b.text;
     if (bigOn) files.push(['big', bigClip()]);
-    cmds.push(`LINE:3,${bigOn ? 1 : 0},${b.scroll ? 'S' : 'T'},${stepMs(b.speed).toFixed(1)},0`);
+    cmds.push(`LINE:3,${bigOn ? 1 : 0},${b.pages ? 'P' : b.scroll ? 'S' : 'T'},${stepMs(b.speed).toFixed(1)},0`);
     const scOn = state.scene.type !== '-';
     if (scOn) files.push(['scn', sceneClip()]);
     cmds.push(`SCENE:${scOn ? 1 : 0},${state.scene.every}`);
