@@ -28,6 +28,7 @@
   .card { background:var(--card); border:1px solid var(--edge); border-radius:14px; padding:14px; margin-bottom:12px;
           box-shadow:inset 0 1px 0 rgba(255,255,255,.04), 0 4px 18px rgba(0,0,0,.5); }
   label { display:block; color:var(--mut); font-size:13px; margin:10px 0 4px; }
+  textarea.grow { resize:none; overflow:hidden; line-height:1.35; font-family:inherit; display:block; }
   input[type=text], textarea {
     width:100%; background:#05070a; color:var(--fg); border:1px solid var(--edge); border-radius:8px; padding:10px; font-size:16px; }
   input[type=text]:focus { outline:none; border-color:var(--blue); box-shadow:0 0 0 2px var(--glow); }
@@ -147,7 +148,7 @@
 
   <label class="chk"><input type="checkbox" id="bigOn"> Lock in tall double-line text (Line 1 + Line 2 become one)</label>
   <div id="bigBody" hidden>
-    <label>Tall text</label><input type="text" id="bigText">
+    <label>Tall text</label><textarea id="bigText" class="grow" rows="2"></textarea>
     <div class="row">
       <button class="sec" id="bm0">Static</button>
       <button class="sec" id="bm1">Scroll</button>
@@ -228,6 +229,12 @@
   <div class="row" style="margin-top:8px">
     <button class="sec" id="savePreset">Save current as preset</button>
   </div>
+  <div class="row">
+    <button class="sec" id="backupP">⬇ Back up presets</button>
+    <button class="sec" id="restoreP">⬆ Restore</button>
+  </div>
+  <input type="file" id="restoreFile" accept=".json,application/json" hidden>
+  <div class="hint">A preset saves everything: text, colors, fonts, modes, scene, brightness and panel layout. Long-press a saved preset to delete it. Your work in progress is also kept automatically.</div>
 </div>
 
 <div class="card">
@@ -272,6 +279,7 @@ const BIGDEF = () => ({ pages:false, hold:2.5, on:false, text:'HALF PRICE {$} CA
                         color:'#ffa000', font:'classic', size:2, bold:true, italic:false });
 function fixState(st) {
   if (!st.scene) st.scene = { type:'D', every:2 };
+  try { if (!SCENES.some(x => x[0] === st.scene.type)) st.scene.type = '-'; } catch {}   // scene was removed from the list
   st.big = Object.assign(BIGDEF(), st.big || {});
   if (st.big.font === 'digital') st.big.font = 'tall';
   st.lines.forEach(fixLine);
@@ -368,7 +376,7 @@ function renderLines() {
     const c = document.createElement('div'); c.className = 'card line-card';
     c.innerHTML = `
       <div class="head"><h2 style="margin:0">Line ${r + 1}</h2><span class="chip">Panels ${nums}</span></div>
-      <label>Text</label><input type="text" class="t" value="">
+      <label>Text</label><textarea class="t grow" rows="2"></textarea>
       <label>Font</label><div class="fontPick"></div>
       <div class="row">
         <button class="sec m0 ${ln.scroll || ln.pages ? '' : 'on'}">Static</button>
@@ -436,7 +444,7 @@ function insertAt(txt) {
   const b = lastBox.el, p = b.selectionStart ?? b.value.length;
   b.value = b.value.slice(0, p) + txt + b.value.slice(b.selectionEnd ?? p);
   lastBox.ln.text = b.value;
-  b.focus(); b.selectionStart = b.selectionEnd = p + txt.length;
+  b.selectionStart = b.selectionEnd = p + txt.length;
   drawPreview();
 }
 
@@ -693,7 +701,7 @@ function animCols(a, now) {   // -> columns of 8 colors|null, same math as the f
   }
   return g;
 }
-const SCENES = [ ['-', 'Off'], ['Y', '🏴‍☠️ Pirate flag (red / pewter)'], ['U', '🏴‍☠️ Pirate flag (creamsicle)'], ['D', '🐬 Dolphin'], ['W', '🌊 Beach wave'], ['E', '👀 Purple eyes'], ['F', '🎆 Fireworks'], ['B', '💧 Bouncing drop'], ['S', '🕷 Halloween spider'], ['A', '🦍 Gorilla smash'], ['X', '🧨 TNT blast'], ['K', '👟 Moonwalk'], ['N', '⭐ PSV nautical star'], ['Q', '📼 Cassette'], ['O', '🪩 Disco ball'], ['Z', '🚗 Lowrider'], ['R', '🌧 Rain'], ['$', '$ Money rain'], ['~', '🧬 DNA helix'], ['*', '✦ Sparkles'], ['>', '« Arrows'] ];
+const SCENES = [ ['-', 'Off'], ['Y', '🏴‍☠️ Pirate flag (red / pewter)'], ['U', '🏴‍☠️ Pirate flag (creamsicle)'], ['D', '🐬 Dolphin'], ['W', '🌊 Beach wave'], ['E', '👀 Purple eyes'], ['F', '🎆 Fireworks'], ['B', '💧 Bouncing drop'], ['S', '🕷 Halloween spider'], ['A', '🦍 Gorilla smash'], ['X', '🧨 TNT blast'], ['Q', '📼 Cassette'], ['O', '🪩 Disco ball'], ['R', '🌧 Rain'], ['$', '$ Money rain'], ['~', '🧬 DNA helix'], ['*', '✦ Sparkles'], ['>', '« Arrows'] ];
 
 // ---------- animated thumbnails ----------
 const thumbs = new Set();
@@ -742,7 +750,6 @@ function makePicker({ options, value, thumb, onPick, label }) {
     cv.hidden = !o;
   };
   thumbs.add({ cv, draw: t => { if (!cv.hidden) thumb(cv, cur, t); } });
-  btn.onpointerdown = e => e.preventDefault();
   btn.onclick = () => {
     const open = list.hidden;
     document.querySelectorAll('.ddlist').forEach(l => l.hidden = true);
@@ -754,7 +761,6 @@ function makePicker({ options, value, thumb, onPick, label }) {
       const s2 = document.createElement('span'); s2.textContent = n;
       row.append(c2, s2);
       thumbs.add({ cv:c2, draw: t => thumb(c2, k, t) });
-      row.onpointerdown = e => e.preventDefault();
       row.onclick = () => { list.hidden = true; if (!label) cur = k; show(); onPick(k); };
       list.appendChild(row);
     });
@@ -1920,6 +1926,38 @@ $('get').onclick = () => send('GET');
   }, true);
   document.addEventListener('pointerup', e => { const el = e.target; if (el instanceof HTMLInputElement && el.type === 'range') { el._ok = undefined; el._old = undefined; } }, true);
 })();
+
+// ---------- text boxes: wrap and grow; keyboard only for the text box you tapped ----------
+function fitBox(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 2 + 'px'; }
+document.addEventListener('input', e => {
+  const el = e.target; if (!(el instanceof HTMLTextAreaElement)) return;
+  if (/\n/.test(el.value)) { const p = el.selectionStart; el.value = el.value.replace(/\n/g, ' '); el.selectionStart = el.selectionEnd = p; el.dispatchEvent(new Event('input')); return; }   // Enter = space
+  fitBox(el);
+}, true);
+new MutationObserver(() => document.querySelectorAll('textarea.grow').forEach(fitBox)).observe(document.body, { childList:true, subtree:true });
+document.addEventListener('pointerdown', e => {   // tapping anything that isn't a text box closes the keyboard
+  const a = document.activeElement, t = e.target;
+  if (a && (a instanceof HTMLTextAreaElement || (a instanceof HTMLInputElement && a.type === 'text')) && t !== a && !(t instanceof HTMLTextAreaElement)) a.blur();
+}, true);
+
+// ---------- keep work in progress, back up / restore presets ----------
+function restoreWork() { try { const w = JSON.parse(localStorage.getItem('tsCurrent') || 'null'); if (w && w.layout && w.lines) state = fixState(w); } catch {} }
+let lastSaved = '';
+setInterval(() => { try { const j = JSON.stringify(state); if (j !== lastSaved) { localStorage.setItem('tsCurrent', j); lastSaved = j; } } catch {} }, 1500);
+$('backupP').onclick = () => {
+  const blob = new Blob([JSON.stringify({ presets: loadSaved(), current: state }, null, 1)], { type:'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'trucksign-presets.json'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+};
+$('restoreP').onclick = () => $('restoreFile').click();
+$('restoreFile').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try { const d = JSON.parse(await f.text()); const mine = loadSaved(), names = new Set(mine.map(p => p.name));
+    (d.presets || []).forEach(p => { if (!names.has(p.name)) mine.push(p); }); storeSaved(mine); renderPresets();
+    alert('Restored ' + (d.presets || []).length + ' preset(s).'); } catch { alert('That file could not be read.'); }
+  e.target.value = '';
+};
+restoreWork();
 
 renderPresets();
 renderAll();
