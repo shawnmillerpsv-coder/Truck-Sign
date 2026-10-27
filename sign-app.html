@@ -701,7 +701,7 @@ function animCols(a, now) {   // -> columns of 8 colors|null, same math as the f
   }
   return g;
 }
-const SCENES = [ ['-', 'Off'], ['Y', '🏴‍☠️ Pirate flag (red / pewter)'], ['U', '🏴‍☠️ Pirate flag (creamsicle)'], ['D', '🐬 Dolphin'], ['W', '🌊 Beach wave'], ['E', '👀 Purple eyes'], ['F', '🎆 Fireworks'], ['B', '💧 Bouncing drop'], ['S', '🕷 Halloween spider'], ['A', '🦍 Gorilla smash'], ['X', '🧨 TNT blast'], ['Q', '📼 Cassette'], ['O', '🪩 Disco ball'], ['R', '🌧 Rain'], ['$', '$ Money rain'], ['~', '🧬 DNA helix'], ['*', '✦ Sparkles'], ['>', '« Arrows'] ];
+const SCENES = [ ['-', 'Off'], ['Y', '🏴‍☠️ Pirate flag (red / pewter)'], ['U', '🏴‍☠️ Pirate flag (creamsicle)'], ['D', '🐬 Dolphin'], ['W', '🌊 Beach wave'], ['E', '👀 Purple eyes'], ['F', '🎆 Fireworks'], ['B', '💧 Bouncing drop'], ['S', '🕷 Halloween spider'], ['A', '🦍 Gorilla smash'], ['X', '🧨 TNT blast'], ['Q', '📼 Cassette'], ['O', '🪩 Disco ball'], ['R', '🌧 Rain'], ['$', '$ Money rain'], ['~', '🧬 DNA helix'], ['*', '✦ Sparkles'], ['>', '« Arrows'], ['J', '🌀 Lava swirl (full color)'], ['I', '🌀 Lava swirl (road safe)'] ];
 
 // ---------- animated thumbnails ----------
 const thumbs = new Set();
@@ -782,7 +782,7 @@ function sceneBox() {
   const x0 = Math.min(...gxs) * PW, y0 = Math.min(...gys) * PH;
   return [x0, y0, (Math.max(...gxs) + 1) * PW - x0, (Math.max(...gys) + 1) * PH - y0];
 }
-const SCENE_LEN = { Y:9600, U:9600, S:10000, X:7000, K:7000, N:9000, Q:7500, O:6500, Z:6500, A:8500, D:6500, '$':4500, R:5000, E:7500, F:6500, B:6500, W:11000, '~':4500, '*':4500, '>':4500 };
+const SCENE_LEN = { J:15040, I:15040, Y:9600, U:9600, S:10000, X:7000, K:7000, N:9000, Q:7500, O:6500, Z:6500, A:8500, D:6500, '$':4500, R:5000, E:7500, F:6500, B:6500, W:11000, '~':4500, '*':4500, '>':4500 };
 const sceneLen = k => SCENE_LEN[k] || 4500;
 const hsh = n => { n = (n ^ 61) ^ (n >>> 16); n = Math.imul(n, 9); n ^= n >>> 4; n = Math.imul(n, 0x27d4eb2d); return (n ^ (n >>> 15)) >>> 0; };
 function shade(hexc, f) {
@@ -808,9 +808,63 @@ function dolphinShape(c) {   // facing left, centered on its body, ~36 dots long
   c.beginPath(); c.moveTo(-16, 1); c.quadraticCurveTo(-4, 4.4, 9, 1.8); c.quadraticCurveTo(-4, 1.6, -16, 1); c.fill();
   c.fillStyle = '#05080c'; c.fillRect(-12.5, -2.2, 1.2, 1.2);
 }
+// ---------- lava swirl: glowing ribbons curling around drifting whirlpools, colors cycle; the loop is seamless ----------
+const LAVA_STEP = 80, LAVA_HS = 24, LAVA_LEV = [0, 0.10, 0.22, 0.38, 0.58, 0.80, 1.0];
+const LAVA_PAL = {
+  J: [[0, 40, 90, 255], [0.16, 150, 50, 255], [0.32, 255, 60, 200], [0.48, 255, 120, 30], [0.62, 255, 210, 40], [0.78, 40, 230, 120], [0.90, 20, 200, 230], [1, 40, 90, 255]],
+  I: [[0, 30, 230, 80], [0.20, 150, 255, 40], [0.40, 255, 220, 30], [0.58, 255, 140, 20], [0.74, 255, 90, 10], [0.88, 255, 200, 120], [1, 30, 230, 80]],
+};
+const lavaColorCache = {};
+function lavaColor(type, hi, lvl) {   // fixed table: 24 hues x 6 brightness levels, so the clip stays small and exact
+  const key = type + hi + ',' + lvl;
+  if (lavaColorCache[key]) return lavaColorCache[key];
+  const P = LAVA_PAL[type], hpos = (hi + 0.5) / LAVA_HS;
+  let k = 0; while (k < P.length - 2 && P[k + 1][0] < hpos) k++;
+  const f = (hpos - P[k][0]) / (P[k + 1][0] - P[k][0]);
+  const m = LAVA_LEV[lvl], top = lvl === LAVA_LEV.length - 1 ? 0.3 : 0;
+  const c = [1, 2, 3].map(i => { let v = (P[k][i] + (P[k + 1][i] - P[k][i]) * f) * m; v += (255 - v) * top; return Math.max(0, Math.min(255, Math.round(v))); });
+  return lavaColorCache[key] = '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
+}
+function lavaVortices(wu) {
+  const n = Math.max(2, Math.round(wu / 1.2)), V = [];
+  for (let i = 0; i < n; i++) {
+    const r1 = (hsh(i * 7 + 3) % 10000) / 10000, r2 = (hsh(i * 13 + 5) % 10000) / 10000;
+    V.push({ bx:(i + 0.5) * wu / n, ax:0.35, ay:0.28, fx:1 + (i % 2), fy:2 - (i % 2), p:r1 * 6.2832,
+             r2:Math.pow(0.55 + 0.10 * (i % 3), 2), s:i % 2 ? -2.6 : 2.6, sf:1 + (i % 3), sp:r2 * 6.2832 });
+  }
+  return V;
+}
+function drawLava(fb, t, type, x0, y0, w, h, occ, fade) {
+  const U = 16, SS = 3, TAU = 6.283185307, a = TAU * t / sceneLen(type), wu = w / U, hu = h / U;
+  const V = lavaVortices(wu).map(d => ({ ...d,
+    cx:d.bx + d.ax * Math.sin(d.fx * a + d.p), cy:hu / 2 + d.ay * Math.sin(d.fy * a + d.p * 1.3),
+    th:d.s * (0.75 + 0.25 * Math.sin(d.sf * a + d.sp)) }));
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (!occ(x0 + x, y0 + y)) continue;
+    let g = 0, hc = 0, hs = 0;
+    for (let sy = 0; sy < SS; sy++) for (let sx = 0; sx < SS; sx++) {
+      let u = (x + (sx + 0.5) / SS - 0.5) / U, v = (y + (sy + 0.5) / SS - 0.5) / U;
+      for (let it = 0; it < 2; it++) for (const d of V) {
+        const dx = u - d.cx, dy = v - d.cy, an = d.th * Math.exp(-(dx * dx + dy * dy) / d.r2), c = Math.cos(an), s = Math.sin(an);
+        u = d.cx + dx * c - dy * s; v = d.cy + dx * s + dy * c;
+      }
+      const f = u * 0.9 + 0.45 * Math.sin(v * 2.2 + a) + 0.2 * Math.sin(u * 1.7 - 2 * a);
+      const rib = 0.5 + 0.5 * Math.cos(TAU * f - 2 * a);
+      g += Math.pow(Math.max(0, Math.min(1, (rib - 0.2) / 0.8)), 1.3);
+      const hue = TAU * (u * 0.09 + v * 0.05) + a;
+      hc += Math.cos(hue); hs += Math.sin(hue);
+    }
+    g /= SS * SS;
+    const lvl = Math.round(Math.round(g * 6) * fade);
+    if (lvl <= 0) continue;
+    const hn = ((Math.atan2(hs, hc) / TAU) % 1 + 1) % 1;
+    fb[(x0 + x) + ',' + (y0 + y)] = lavaColor(type, Math.floor(hn * LAVA_HS) % LAVA_HS, lvl);
+  }
+}
 function sceneDraw(fb, t, type, x0, y0, w, h, occ) {   // draw a scene with a soft fade in and fade out
-  drawScene(fb, t, type, x0, y0, w, h, occ);
   const L = sceneLen(type), f = Math.max(0, Math.min(1, t / 250, (L - t) / 350));
+  if (LAVA_PAL[type]) { drawLava(fb, t, type, x0, y0, w, h, occ || ((x, y) => x >= x0 && x < x0 + w && y >= y0 && y < y0 + h), f); return; }
+  drawScene(fb, t, type, x0, y0, w, h, occ);
   if (f < 1) for (const key in fb) fb[key] = shade(fb[key], f);
 }
 function drawScene(fb, t, type, x0, y0, w, h, occ) {
@@ -1838,13 +1892,14 @@ function sceneClip() {
   const occupied = new Set(state.layout.map(p => p[0] + ',' + p[1]));
   const occ = (x, y) => occupied.has(Math.floor(x / PW) + ',' + Math.floor(y / PH));
   const frames = [];
-  for (let t = 0; t < L; t += SCENE_STEP) {
+  const step = LAVA_PAL[type] ? LAVA_STEP : SCENE_STEP;
+  for (let t = 0; t < L; t += step) {
     const fb = {}; sceneDraw(fb, t, type, x0, y0, w, h, occ);
     const px = [];
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) px.push(fb[(x0 + x) + ',' + (y0 + y)] || null);
     frames.push({ w, h, px });
   }
-  return encodeClip(frames, SCENE_STEP);
+  return encodeClip(frames, step);
 }
 let sentHash = {};
 const hashBytes = u => { let h = 2166136261; for (let i = 0; i < u.length; i++) h = Math.imul(h ^ u[i], 16777619); return (h >>> 0) + ':' + u.length; };
