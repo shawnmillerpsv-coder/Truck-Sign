@@ -73,6 +73,7 @@
   .chip { font-size:12px; color:var(--blue); border:1px solid var(--blue); border-radius:20px; padding:2px 8px; }
   .presets { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .presets button { margin-top:0; font-size:13px; padding:10px 8px; }
+  .presets button.openp { border-color:var(--blue, #3b8cff); box-shadow:0 0 0 1px var(--blue, #3b8cff) inset; }
   #log { font:12px monospace; color:var(--mut); white-space:pre-wrap; max-height:110px; overflow:auto; margin-top:8px; }
   .ticks { display:flex; justify-content:space-between; font-size:11px; color:var(--mut); margin-top:2px; }
   .anims { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-top:6px; }
@@ -227,14 +228,15 @@
   <h2>Presets</h2>
   <div class="presets" id="presets"></div>
   <div class="row" style="margin-top:8px">
-    <button class="sec" id="savePreset">Save current as preset</button>
+    <button id="saveOpen" title="Save changes to the preset you opened">💾 Save</button>
+    <button class="sec" id="savePreset">Save as new preset</button>
   </div>
   <div class="row">
     <button class="sec" id="backupP">⬇ Back up presets</button>
     <button class="sec" id="restoreP">⬆ Restore</button>
   </div>
   <input type="file" id="restoreFile" accept=".json,application/json" hidden>
-  <div class="hint">A preset saves everything: text, colors, fonts, modes, scene, brightness and panel layout. Long-press a saved preset to delete it. Your work in progress is also kept automatically.</div>
+  <div class="hint">A preset saves everything: text, colors, fonts, modes, scene, brightness and panel layout. Open a preset, change it, then tap 💾 Save to update it. Long-press a saved preset to delete it. Your work in progress is also kept automatically.</div>
 </div>
 
 <div class="card">
@@ -312,18 +314,36 @@ function renderPresets() {
   const box = $('presets'); box.innerHTML = '';
   [...BUILTIN, ...loadSaved()].forEach((p, i) => {
     const b = document.createElement('button');
-    b.className = 'sec'; b.textContent = p.name;
-    b.onclick = () => { state = fixState(structuredClone(p)); renderAll(); };
+    const mine = i >= BUILTIN.length;
+    b.className = 'sec' + (mine && p.name === openPreset ? ' openp' : ''); b.textContent = p.name;
+    b.onclick = () => { state = fixState(structuredClone(p)); setOpenPreset(mine ? p.name : null); renderAll(); };
     if (i >= BUILTIN.length) b.oncontextmenu = e => {
       e.preventDefault();
-      if (confirm('Delete preset "' + p.name + '"?')) { const s = loadSaved(); s.splice(i - BUILTIN.length, 1); storeSaved(s); renderPresets(); }
+      if (confirm('Delete preset "' + p.name + '"?')) { const s = loadSaved(); s.splice(i - BUILTIN.length, 1); storeSaved(s); if (p.name === openPreset) setOpenPreset(null); renderPresets(); }
     };
     box.appendChild(b);
   });
 }
-$('savePreset').onclick = () => {
-  const name = prompt('Preset name?'); if (!name) return;
-  const s = loadSaved(); s.push({ ...structuredClone(state), name }); storeSaved(s); renderPresets();
+let openPreset = null;
+try { openPreset = localStorage.getItem('tsOpenPreset'); } catch {}
+function setOpenPreset(n) { openPreset = n; try { n ? localStorage.setItem('tsOpenPreset', n) : localStorage.removeItem('tsOpenPreset'); } catch {} }
+function putPreset(name) {   // save the current work under this name, replacing a preset with the same name
+  const s = loadSaved(), i = s.findIndex(p => p.name === name), rec = { ...structuredClone(state), name };
+  if (i >= 0) s[i] = rec; else s.push(rec);
+  storeSaved(s); setOpenPreset(name); renderPresets();
+  const b = $('saveOpen'), old = '💾 Save'; b.textContent = 'Saved ✓'; setTimeout(() => b.textContent = old, 1400);
+}
+function saveAsNew() {
+  const name = (prompt('Name for the new preset?') || '').trim(); if (!name) return;
+  if (loadSaved().some(p => p.name === name) && !confirm('A preset called "' + name + '" already exists. Replace it?')) return;
+  putPreset(name);
+}
+$('savePreset').onclick = saveAsNew;
+$('saveOpen').onclick = () => {
+  const have = openPreset && loadSaved().some(p => p.name === openPreset);
+  if (!have) { saveAsNew(); return; }
+  if (confirm('Overwrite preset "' + openPreset + '" with your changes?\n\nOK = overwrite      Cancel = save as a new preset')) putPreset(openPreset);
+  else saveAsNew();
 };
 
 // ---------- layout grid ----------
@@ -701,7 +721,7 @@ function animCols(a, now) {   // -> columns of 8 colors|null, same math as the f
   }
   return g;
 }
-const SCENES = [ ['-', 'Off'], ['Y', '🏴‍☠️ Pirate flag (red / pewter)'], ['U', '🏴‍☠️ Pirate flag (creamsicle)'], ['D', '🐬 Dolphin'], ['W', '🌊 Beach wave'], ['E', '👀 Purple eyes'], ['F', '🎆 Fireworks'], ['B', '💧 Bouncing drop'], ['S', '🕷 Halloween spider'], ['A', '🦍 Gorilla smash'], ['X', '🧨 TNT blast'], ['Q', '📼 Cassette'], ['O', '🪩 Disco ball'], ['R', '🌧 Rain'], ['$', '$ Money rain'], ['~', '🧬 DNA helix'], ['*', '✦ Sparkles'], ['>', '« Arrows'], ['J', '🌀 Lava swirl (full color)'], ['I', '🌀 Lava swirl (road safe)'] ];
+const SCENES = [ ['-', 'Off'], ['Y', '🏴‍☠️ Pirate flag (red / pewter)'], ['U', '🏴‍☠️ Pirate flag (creamsicle)'], ['D', '🐬 Dolphin'], ['W', '🌊 Beach wave'], ['E', '👀 Purple eyes'], ['F', '🎆 Fireworks'], ['B', '💧 Bouncing drop'], ['S', '🕷 Halloween spider'], ['A', '🦍 Gorilla smash'], ['X', '🧨 TNT blast'], ['Q', '📼 Cassette'], ['O', '🪩 Disco ball'], ['R', '🌧 Rain'], ['$', '$ Money rain'], ['~', '🧬 DNA helix'], ['*', '✦ Sparkles'], ['>', '« Arrows'], ['J', '🌀 Lava swirl (full color)'], ['I', '🌀 Lava swirl (road safe)'], ['G', '💨 Smoke face (blue)'], ['H', '💨 Smoke face (drive safe)'] ];
 
 // ---------- animated thumbnails ----------
 const thumbs = new Set();
@@ -782,7 +802,7 @@ function sceneBox() {
   const x0 = Math.min(...gxs) * PW, y0 = Math.min(...gys) * PH;
   return [x0, y0, (Math.max(...gxs) + 1) * PW - x0, (Math.max(...gys) + 1) * PH - y0];
 }
-const SCENE_LEN = { J:15040, I:15040, Y:9600, U:9600, S:10000, X:7000, K:7000, N:9000, Q:7500, O:6500, Z:6500, A:8500, D:6500, '$':4500, R:5000, E:7500, F:6500, B:6500, W:11000, '~':4500, '*':4500, '>':4500 };
+const SCENE_LEN = { G:10000, H:10000, J:15040, I:15040, Y:9600, U:9600, S:10000, X:7000, K:7000, N:9000, Q:7500, O:6500, Z:6500, A:8500, D:6500, '$':4500, R:5000, E:7500, F:6500, B:6500, W:11000, '~':4500, '*':4500, '>':4500 };
 const sceneLen = k => SCENE_LEN[k] || 4500;
 const hsh = n => { n = (n ^ 61) ^ (n >>> 16); n = Math.imul(n, 9); n ^= n >>> 4; n = Math.imul(n, 0x27d4eb2d); return (n ^ (n >>> 15)) >>> 0; };
 function shade(hexc, f) {
@@ -861,9 +881,92 @@ function drawLava(fb, t, type, x0, y0, w, h, occ, fade) {
     fb[(x0 + x) + ',' + (y0 + y)] = lavaColor(type, Math.floor(hn * LAVA_HS) % LAVA_HS, lvl);
   }
 }
+// ---------- smoke face: smoke swirls in, a woman's profile forms, blows a smoke ring that slows, grows and fades ----------
+const SMOKE_PAL = {
+  G: [[0, 10, 22, 70], [0.35, 30, 70, 170], [0.6, 70, 110, 190], [0.8, 120, 130, 150], [1, 185, 190, 205]],
+  H: [[0, 40, 6, 2], [0.3, 140, 14, 6], [0.55, 215, 80, 8], [0.8, 255, 150, 18], [1, 255, 205, 110]],
+};
+const SMOKE_PROF = [-2.6, -1.2, -0.3, 0.3, 0.7, 0.2, 1.2, 2.6, 4.0, 2.2, 2.1, 1.3, 1.9, 0.7, 1.1, -2.6];   // how far each row sticks out (dots), forehead to neck
+const smokeCache = {};
+function smokeColor(type, kind, idx, lvl) {   // fixed table so the clip stays small: 10 smoke tones or 4 white tones x 7 levels
+  const key = type + kind + idx + ',' + lvl;
+  if (smokeCache[key]) return smokeCache[key];
+  let rgb;
+  if (kind === 'w') { const f = idx / 3; rgb = [120 + 118 * f, 128 + 112 * f, 145 + 103 * f]; }
+  else {
+    const P = SMOKE_PAL[type], hp = (idx + 0.5) / 10;
+    let k = 0; while (k < P.length - 2 && P[k + 1][0] < hp) k++;
+    const f = (hp - P[k][0]) / (P[k + 1][0] - P[k][0]); rgb = [1, 2, 3].map(i => P[k][i] + (P[k + 1][i] - P[k][i]) * f);
+  }
+  const m = lvl / 7;
+  return smokeCache[key] = rgbHex(rgb.map(v => v * m));
+}
+function drawSmokeFace(fb, t, type, x0, y0, w, h, occ, fade) {
+  const T = t / 1000, SS = 3, TAU = 6.283185307, sy = h / 16, a = T * 0.9, wu = w / 16;
+  const E = (x0e, x1e, x) => { const q = Math.max(0, Math.min(1, (x - x0e) / (x1e - x0e))); return q * q * (3 - 2 * q); };
+  const ez = q => { q = Math.max(0, Math.min(1, q)); return q * q * (3 - 2 * q); };
+  const grow = ez(T / 2.4), recede = ez((T - 7.6) / 2.2), edge = w - 0.40 * w * grow * (1 - recede);
+  const face = ez((T - 2.4) / 1.4) * (1 - ez((T - 5.6) / 1.6));
+  const openm = ez((T - 4.0) / 0.7) * (1 - Math.max(0, Math.min(1, (T - 5.0) / 0.12)));
+  const fx = edge + 3.0 * sy, my = 11.6 * sy, mx = fx - 1.3 * sy;
+  const inten = ez(T / 0.6) * (1 - ez((T - 8.6) / 1.3));
+  const V = [0, 1, 2].map(i => ({ cx: wu - 0.40 * wu * (i + 0.5) / 3 + 0.12 * Math.sin(a * 1.5 + i * 2.1), cy: (h / 32) + 0.22 * Math.sin(a * 2 + i * 1.7), s: i % 2 ? -2.4 : 2.4 }));
+  const prof = yd => { const q = Math.max(0, Math.min(15, yd / sy - 0.5)), k = Math.min(14, Math.floor(q)); return (SMOKE_PROF[k] + (SMOKE_PROF[k + 1] - SMOKE_PROF[k]) * (q - k)) * sy; };
+  let ring = null;
+  if (T >= 5.0) {   // the ring leaves the lips fast, slows down while it grows, then evaporates
+    const tau = 1.5, D = (mx - 1.5 * sy) - 0.12 * w, k = (1 - Math.exp(-(T - 5.0) / tau)) / (1 - Math.exp(-5 / tau));
+    const ry = (2.2 + 5.0 * k) * sy;
+    ring = { cx: mx - 1.5 * sy - D * k, cy: my + (8 * sy - my) * ez(k * 1.4), ry, rx: 0.42 * ry, tube: (0.9 + 0.9 * k) * sy,
+             fade: Math.max(0, Math.min(1, (T - 5.0) / 0.15)) * (1 - ez((T - 8.0) / 1.6)), brk: ez((T - 7.4) / 1.8) };
+  }
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (!occ(x0 + x, y0 + y)) continue;
+    let sm = 0, sh = 0, wh = 0, tone = 0;
+    for (let sj = 0; sj < SS; sj++) for (let si = 0; si < SS; si++) {
+      const px = x + (si + 0.5) / SS - 0.5, py = y + (sj + 0.5) / SS - 0.5;
+      let uu = px / 16, vv = py / 16;
+      for (let it = 0; it < 2; it++) for (const d of V) {
+        const dx = uu - d.cx, dy = vv - d.cy, th = d.s * Math.exp(-(dx * dx + dy * dy) / 0.30), c = Math.cos(th), s = Math.sin(th);
+        uu = d.cx + dx * c - dy * s; vv = d.cy + dx * s + dy * c;
+      }
+      const rib = 0.5 + 0.5 * Math.cos(TAU * (uu + 0.5 * Math.sin(vv * 2.4 + a * 1.3)) - a * 3);
+      const g = Math.pow(Math.max(0, Math.min(1, (rib - 0.15) / 0.85)), 1.2);
+      const jaw = py > my ? 1.5 * sy * openm : 0, bound = fx - prof(py) + jaw;
+      const wisp = edge + (uu * 16 - px) * 0.6 + 1.2 * Math.sin(py / sy * 0.9 + a * 3);
+      const b = wisp * (1 - face) + bound * face;
+      let mask = E(b - 0.6, b + 1.2, px);
+      const gap = Math.exp(-(Math.pow((px - (fx + 0.2 * sy)) / ((1.2 + 1.6 * openm) * sy), 2) + Math.pow((py - my) / ((0.35 + 0.55 * openm) * sy), 2)) * 2.2) * openm;
+      mask *= 1 - gap;
+      const near = Math.max(0, Math.min(1, 1.6 - (px - b) / 6)) * face;
+      const eye = Math.exp(-(Math.pow((px - (fx - prof(5.0 * sy) + 2.4 * sy)) / (0.55 * sy), 2) + Math.pow((py - 5.2 * sy) / (0.3 * sy), 2))) * face;
+      const body = (g * (1 - near) + (0.75 + 0.1 * g) * near) * (1 - 0.9 * eye);
+      sm += body * mask * inten;
+      sh += Math.max(0, Math.min(1, 0.12 + 0.55 * g * (1 - near) + 0.42 * near));
+      let o = Math.exp(-Math.pow((px - b) / 0.75, 2)) * face * 1.5 * (1 - gap) * inten, ot = 3;
+      if (ring) {
+        const dxr = (px - ring.cx) / ring.rx, dyr = (py - ring.cy) / ring.ry, d = Math.sqrt(dxr * dxr + dyr * dyr), sd = (d - 1) * ring.ry;
+        const roll = 0.72 + 0.28 * Math.sin(TAU * (sd / ring.tube) * 0.45 - (T - 5.0) * 9);
+        const lobes = 0.75 + 0.25 * Math.abs(dyr / Math.max(d, 1e-3));
+        const noise = 0.5 + 0.5 * Math.sin(px * 2.3 + py * 1.7) * Math.sin(px * 1.1 - py * 2.9 + T);
+        const ra = Math.max(0, Math.min(1, Math.exp(-Math.pow(sd / ring.tube, 2)) * roll * lobes * ring.fade * Math.max(0, 1 - ring.brk * 1.3 * noise)));
+        if (ra > o) { o = ra; ot = Math.round((roll - 0.44) / 0.56 * 3); }
+      }
+      wh += Math.min(1, o); tone += ot;
+    }
+    const n = SS * SS; sm /= n; sh /= n; wh /= n; tone /= n;
+    if (wh >= 0.3 && wh >= sm * 0.8) {
+      const lvl = Math.round(Math.min(1, wh) * 7 * fade);
+      if (lvl > 0) fb[(x0 + x) + ',' + (y0 + y)] = smokeColor(type, 'w', Math.max(0, Math.min(3, Math.round(tone))), lvl);
+    } else {
+      const lvl = Math.round(Math.min(1, sm) * 7 * fade);
+      if (lvl > 0) fb[(x0 + x) + ',' + (y0 + y)] = smokeColor(type, 's', Math.max(0, Math.min(9, Math.floor(sh * 10))), lvl);
+    }
+  }
+}
 function sceneDraw(fb, t, type, x0, y0, w, h, occ) {   // draw a scene with a soft fade in and fade out
   const L = sceneLen(type), f = Math.max(0, Math.min(1, t / 250, (L - t) / 350));
   if (LAVA_PAL[type]) { drawLava(fb, t, type, x0, y0, w, h, occ || ((x, y) => x >= x0 && x < x0 + w && y >= y0 && y < y0 + h), f); return; }
+  if (SMOKE_PAL[type]) { drawSmokeFace(fb, t, type, x0, y0, w, h, occ || ((x, y) => x >= x0 && x < x0 + w && y >= y0 && y < y0 + h), f); return; }
   drawScene(fb, t, type, x0, y0, w, h, occ);
   if (f < 1) for (const key in fb) fb[key] = shade(fb[key], f);
 }
@@ -1466,8 +1569,9 @@ function bigRaster(b, now) {   // -> columns of 16 colors|null
   return out;
 }
 // ---------- Pages mode: text in pages that change with a transition (like stadium boards) ----------
-const PAGE_TRANS = [['fade', 'Fade'], ['doors', 'Red / pewter doors'], ['slide', 'Slide up'], ['left', 'Push left'], ['dissolve', 'Pixel dissolve'], ['shine', 'Shine']];
-const TRANS_MS = { fade:700, doors:1300, slide:650, left:650, dissolve:900, shine:250 };
+const PAGE_TRANS = [['fade', 'Fade'], ['doors', 'Red / pewter doors'], ['slide', 'Slide up'], ['left', 'Push left'], ['dissolve', 'Pixel dissolve'], ['shine', 'Shine'], ['invg', 'Inverse flash (green)'], ['inva', 'Inverse flash (amber)']];
+const INV = { invg:'#18c840', inva:'#ffa000' };   // next page: black letters on a solid band
+const TRANS_MS = { fade:700, doors:1300, slide:650, left:650, dissolve:900, shine:250, invg:520, inva:520 };
 const PAGE_STEP = 40;
 const hexRgb = c => { const v = parseInt(c.slice(1), 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
 const rgbHex = a => '#' + a.map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
@@ -1476,10 +1580,11 @@ const easeIO = p => { p = Math.max(0, Math.min(1, p)); return p * p * (3 - 2 * p
 function parsePages(text) {
   const parts = text.split(/\{:(\w+)\}/), pages = [];
   for (let i = 0; i < parts.length; i += 2) {
-    const t = parts[i].trim(), tr = parts[i + 1];
-    if (t) pages.push({ text:t, trans: tr || 'fade' });
+    const t = parts[i].trim(), tr = parts[i + 1], before = i > 0 ? parts[i - 1] : null;
+    if (t) pages.push({ text:t, trans: tr || 'fade', inv: INV[before] || null });
     else if (tr && pages.length) pages[pages.length - 1].trans = tr;
   }
+  if (pages.length > 1 && INV[pages[pages.length - 1].trans]) pages[0].inv = INV[pages[pages.length - 1].trans];   // a marker at the end flips the first page
   return pages;
 }
 function pagesInfo(src) {
@@ -1489,7 +1594,12 @@ function pagesInfo(src) {
   return { pages, seg, total: Math.max(total, 1) };
 }
 const blankGrid = (W, H) => [...Array(W)].map(() => Array(H).fill(null));
-function pageGrid(src, txt, W, H, t) {   // one page, centered, as W columns of H colors
+function pageGrid(src, txt, W, H, t, inv) {   // one page, centered, as W columns of H colors
+  if (inv) {   // inverse flash: bold black letters cut out of a solid band
+    const L = pageGrid({ ...src, bold:true }, txt, W, H, t, null);
+    const fat = src.kind === 'big';   // tall text gets extra-thick strokes; the 8-dot font keeps its letter holes
+    return mapGrid(L, (c, x, y) => (c || (fat && x > 0 && L[x - 1][y])) ? '#000000' : inv);
+  }
   const g = blankGrid(W, H);
   const place = (cols, y0) => { const x0 = Math.floor((W - cols.length) / 2); cols.forEach((col, i) => col.forEach((c, y) => { const x = x0 + i; if (c && x >= 0 && x < W && y0 + y >= 0 && y0 + y < H) g[x][y0 + y] = c; })); };
   const lines = txt.split('|').map(x => x.trim()).filter(Boolean);
@@ -1525,6 +1635,12 @@ function transition(kind, A, B, f, W, H) {
   const e = easeIO(f);
   if (kind === 'slide') { const d = Math.round(e * H); return mapGrid(A, (c, x, y) => { const ya = y + d, yb = y + d - H; return ya < H ? A[x][ya] : (yb >= 0 ? B[x][yb] : null); }); }
   if (kind === 'left') { const d = Math.round(e * W); return mapGrid(A, (c, x, y) => { const xa = x + d, xb = x + d - W; return xa < W ? A[xa][y] : (xb >= 0 ? B[xb][y] : null); }); }
+  if (INV[kind]) {   // quick fade, a white pop, a blink of black, then the band snaps on
+    if (f < 0.35) return mapGrid(A, c => c && shade(c, 1 - f / 0.35));
+    if (f < 0.47) return mapGrid(A, () => '#ffffff');
+    if (f < 0.6) return blankGrid(W, H);
+    return B;
+  }
   if (kind === 'dissolve') return mapGrid(A, (c, x, y) => (hsh(x * 31 + y * 17 + 5) % 1000) / 1000 < e ? B[x][y] : c);
   if (kind === 'doors') {
     const closing = f < 0.45, k = closing ? 1.3 * (1 - easeIO(f / 0.45)) : f < 0.55 ? 0 : 1.3 * easeIO((f - 0.55) / 0.45);
@@ -1544,17 +1660,18 @@ function pagesFrame(src, W, H, t) {
   const tt = ((t % total) + total) % total;
   let i = seg.findIndex(sg => tt < sg.start + sg.hold + sg.tlen); if (i < 0) i = seg.length - 1;
   const sg = seg[i], j = (i + 1) % pages.length, local = tt - sg.start;
-  const A = pageGrid(src, pages[i].text, W, H, tt);
+  const A = pageGrid(src, pages[i].text, W, H, tt, pages[i].inv);
   if (local < sg.hold) {
     const enteredBy = seg[(i - 1 + seg.length) % seg.length].trans;
     if (enteredBy === 'shine') return shineGrid(A, local, W, H);
     return A;
   }
-  return transition(sg.trans, A, pageGrid(src, pages[j].text, W, H, tt), (local - sg.hold) / sg.tlen, W, H);
+  return transition(sg.trans, A, pageGrid(src, pages[j].text, W, H, tt, pages[j].inv), (local - sg.hold) / sg.tlen, W, H);
 }
 function transThumb(cv, k, now) {
   const W = 20, H = 8, mk = (ch, col) => { const g = blankGrid(W, H); const gl = glyph(ch); gl.forEach((c, i) => c.forEach((on, y) => { if (on) { g[6 + i][y] = col; g[7 + i][y] = col; } })); return g; };
-  const f = Math.min(1, ((now % 1800) / 1800) * 1.4), out = k === 'shine' ? shineGrid(mk('A', '#ffa000'), now % 1200, W, H) : transition(k, mk('A', '#ffa000'), mk('B', '#ffffff'), f, W, H);
+  const Bg = INV[k] ? mapGrid(mk('B', '#ffffff'), c => c ? '#000000' : INV[k]) : mk('B', '#ffffff');
+  const f = Math.min(1, ((now % 1800) / 1800) * 1.4), out = k === 'shine' ? shineGrid(mk('A', '#ffa000'), now % 1200, W, H) : transition(k, mk('A', '#ffa000'), Bg, f, W, H);
   dots(cv, W, H, 3, (x, y) => out[x][y]);
 }
 let pageStart = 0, pageLoops = {};
@@ -1892,7 +2009,7 @@ function sceneClip() {
   const occupied = new Set(state.layout.map(p => p[0] + ',' + p[1]));
   const occ = (x, y) => occupied.has(Math.floor(x / PW) + ',' + Math.floor(y / PH));
   const frames = [];
-  const step = LAVA_PAL[type] ? LAVA_STEP : SCENE_STEP;
+  const step = LAVA_PAL[type] || SMOKE_PAL[type] ? LAVA_STEP : SCENE_STEP;
   for (let t = 0; t < L; t += step) {
     const fb = {}; sceneDraw(fb, t, type, x0, y0, w, h, occ);
     const px = [];
