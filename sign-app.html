@@ -71,6 +71,10 @@
 
   .line-card .head { display:flex; justify-content:space-between; align-items:center; }
   .chip { font-size:12px; color:var(--blue); border:1px solid var(--blue); border-radius:20px; padding:2px 8px; }
+  .varbox { display:flex; align-items:center; gap:8px; margin-top:6px; }
+  .varbox:empty { display:none; }
+  .varbox .vtag { font-size:12px; opacity:.7; flex:none; }
+  .varbox .dd { flex:1; }
   .presets { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .presets button { margin-top:0; font-size:13px; padding:10px 8px; }
   .presets button.openp { border-color:var(--blue, #3b8cff); box-shadow:0 0 0 1px var(--blue, #3b8cff) inset; }
@@ -273,7 +277,14 @@ const BUILTIN = [
   { name:'4-2 Tall scrolling ad', layout:[[0,0],[1,0],[2,0],[3,0],[1,1],[2,1]], lines:[L(true, AD, '#ffa000'), L(false, PHONE), L(false, '')], bright:60,
     big:{ on:true, text:'WHOLESALE {FFFFFF}CABINETS{} {$} HALF PRICE' } },
 ];
-const ANIMS = [ ['-', 'None'], ['$', '$ Dollars'], ['~', '〰 Wave'], ['D', '🐬 Dolphin'], ['*', '✦ Sparkle'], ['>', '» Arrows'], ['g', '■ Box Man green'], ['r', '■ Box Man red'], ['y', '■ Box Man yellow'], ['b', '■ Box Man blue'], ['G', '👻 White ghost'], ['V', '👻 Purple ghost'], ['T', '🧨 TNT'], ['M', '👟 Dancing shoes'], ['H', '🔨 Hammer'], ['C', '🚪 Cabinet door'], ['L', '❤ Heart'] ];
+const ANIM_FAMS = [   // [name, [[key, color name], ...]] - one entry per item, a second drop-down picks the color
+  ['None', [['-', '']]], ['$ Dollars', [['$', '']]], ['⭐ Gold stars', [['S', '']]], ['🪣 Paint bucket', [['B', '']]],
+  ['〰 Wave', [['~', '']]], ['🐬 Dolphin', [['D', '']]], ['✦ Sparkle', [['*', '']]], ['» Arrows', [['>', '']]],
+  ['■ Box Man', [['g', 'Green'], ['r', 'Red'], ['y', 'Yellow'], ['b', 'Blue']]],
+  ['👻 Ghost', [['G', 'White'], ['V', 'Purple']]],
+  ['🧨 TNT', [['T', '']]], ['👟 Dancing shoes', [['M', '']]], ['🔨 Hammer', [['H', '']]], ['🚪 Cabinet door', [['C', '']]], ['❤ Heart', [['L', '']]] ];
+const famFlat = F => F.flatMap(([n, v]) => v.map(([k, c]) => [k, c ? n + ' (' + c.toLowerCase() + ')' : n]));
+const ANIMS = famFlat(ANIM_FAMS);
 const GAPS = ['B', '3', '2', '1', '0'];   // slider left -> right
 const GAPNAME = { B:'Blank (scrolls fully off)', 3:'3 panels', 2:'2 panels', 1:'1 panel', 0:'No gap' };
 const stepMs = sp => sp <= 10 ? 90 - (sp - 1) * (75 / 9) : 150 / sp;   // ms per 1-dot move; 20 = twice the old top speed
@@ -441,11 +452,11 @@ function renderLines() {
     c.querySelector('.fontPick').appendChild(makePicker({
       options: FONTS, value: ln.font, thumb: fontThumb,
       onPick: k => { ln.font = k; resetSim(); renderLines(); drawPreview(); } }));
-    c.querySelector('.gapPick').appendChild(makePicker({
-      options: ANIMS, value: ln.anim, thumb: animThumb,
+    c.querySelector('.gapPick').appendChild(makeFamPicker({
+      fams: ANIM_FAMS, value: ln.anim, thumb: animThumb,
       onPick: k => { ln.anim = k; resetSim(); drawPreview(); } }));
-    c.querySelector('.insPick').appendChild(makePicker({
-      options: ANIMS.slice(1), value: null, thumb: animThumb, label: '+ Pick an animation to insert',
+    c.querySelector('.insPick').appendChild(makeFamPicker({
+      fams: ANIM_FAMS.slice(1), value: null, thumb: animThumb, label: '+ Pick an animation to insert',
       onPick: k => {
         const p = Math.min(ln._caret ?? ln.text.length, ln.text.length);
         ln.text = ln.text.slice(0, p) + ' {' + k + '} ' + ln.text.slice(p);
@@ -632,7 +643,7 @@ function glyph(ch) {   // fixed dot fonts: 5x7 capitals/numbers/punctuation, 4x8
   cols.push(Array(8).fill(false));
   return glyphCache[ch] = cols;
 }
-const ANIMW = { '$':20, '~':18, 'D':22, '*':14, '>':16, P:22, g:22, r:22, y:22, b:22, G:12, V:12, T:14, M:16, H:14, C:12, L:10 };
+const ANIMW = { S:20, B:18, '$':20, '~':18, 'D':22, '*':14, '>':16, P:22, g:22, r:22, y:22, b:22, G:12, V:12, T:14, M:16, H:14, C:12, L:10 };
 const DOLPHIN = [0b0000100000, 0b0001110000, 0b1011111110, 0b0111111111, 0b1000011000];
 function hsvToHex(hue255) {   // FastLED-style hue (0-255), full saturation
   const h = hue255 / 255 * 360, f = n => { const k = (n + h / 60) % 6; return Math.round(255 * (1 - Math.max(0, Math.min(k, 4 - k, 1)))); };
@@ -641,7 +652,28 @@ function hsvToHex(hue255) {   // FastLED-style hue (0-255), full saturation
 function animCols(a, now) {   // -> columns of 8 colors|null, same math as the firmware
   const w = ANIMW[a], g = [...Array(w)].map(() => Array(8).fill(null));
   const set = (x, y, c) => { if (x >= 0 && x < w && y >= 0 && y < 8) g[x][y] = c; };
-  if (a === '$') {
+  if (a === 'S') {   // two gold stars bobbing up and down out of step
+    const STAR = ['...#...', '..###..', '#######', '.#####.', '..###..', '.##.##.', '.#...#.'];
+    for (let i = 0; i < 2; i++) {
+      const beat = (Math.floor(now / 250) + i) % 2, x0 = 2 + i * 9, tw = Math.floor(now / 125 + i * 3) % 6;
+      STAR.forEach((r, y) => [...r].forEach((ch, x) => { if (ch === '#') set(x0 + x, y + beat, y < 3 && x === 3 ? '#fff3a0' : (x === 0 || x === 6 || y === 6) ? '#c89600' : '#ffd000'); }));
+      if (tw === 0) set(x0 + 3, beat, '#ffffff');
+    }
+  } else if (a === 'B') {   // paint bucket tips over and pours a white puddle
+    const cyc = now % 2400, tipped = cyc > 320;
+    const GR = '#9aa4b0', RM = '#d0d6de', DK = '#5a626e', WH = '#ffffff', LW = '#c8ccd2';
+    if (!tipped) {
+      ['rrrrrr', 'bwwwwb', 'bbbbbb', 'bbbbbb', '.bbbb.'].forEach((r, y) => [...r].forEach((ch, x) => { if (ch !== '.') set(1 + x, 2 + y, ch === 'r' ? RM : ch === 'w' ? WH : x === 0 || x === 5 ? DK : GR); }));
+      set(2, 1, DK); set(5, 1, DK); set(3, 0, DK); set(4, 0, DK);
+    } else {
+      ['..rb..', '.rwbb.', 'rwwbbb', '.rbbbb', '...bb.'].forEach((r, y) => [...r].forEach((ch, x) => { if (ch !== '.') set(1 + x, 1 + y, ch === 'r' ? RM : ch === 'w' ? WH : x >= 4 ? DK : GR); }));
+    }
+    const pour = cyc > 480 && cyc < 1750;
+    if (pour) [[6, 2], [7, 3], [7, 4], [8, 5], [8, 6]].forEach(([x, y], i) => { if (cyc - 480 > i * 40) set(x, y, (Math.floor(now / 90) + i) % 3 ? WH : LW); });
+    const grow = Math.max(0, Math.min(1, (cyc - 560) / 1300)), half = Math.round(1 + grow * 7.5), fade = cyc > 2050 ? 1 - (cyc - 2050) / 350 : 1;
+    if (cyc > 560) for (let x = 8 - half; x <= 8 + half; x++) { const edge = Math.abs(x - 8) >= half - 1; set(x, 7, shade(edge ? LW : WH, fade)); }
+    if (cyc > 900) for (let x = 8 - Math.floor(half / 2); x <= 8 + Math.floor(half / 2); x++) set(x, 6, shade(LW, fade * 0.8));
+  } else if (a === '$') {
     const d = glyph('$');
     for (let i = 0; i < 2; i++) {
       const beat = (Math.floor(now / 250) + i) % 2, col = beat ? '#00e05a' : '#ffd000';
@@ -721,7 +753,18 @@ function animCols(a, now) {   // -> columns of 8 colors|null, same math as the f
   }
   return g;
 }
-const SCENES = [ ['-', 'Off'], ['Y', '🏴‍☠️ Pirate flag (red / pewter)'], ['U', '🏴‍☠️ Pirate flag (creamsicle)'], ['D', '🐬 Dolphin'], ['W', '🌊 Beach wave'], ['E', '👀 Purple eyes'], ['F', '🎆 Fireworks'], ['B', '💧 Bouncing drop'], ['S', '🕷 Halloween spider'], ['A', '🦍 Gorilla smash'], ['X', '🧨 TNT blast'], ['Q', '📼 Cassette'], ['O', '🪩 Disco ball'], ['R', '🌧 Rain'], ['$', '$ Money rain'], ['~', '🧬 DNA helix'], ['*', '✦ Sparkles'], ['>', '« Arrows'], ['J', '🌀 Lava swirl (full color)'], ['I', '🌀 Lava swirl (road safe)'], ['G', '💨 Smoke face (blue)'], ['H', '💨 Smoke face (drive safe)'] ];
+const SCENE_FAMS = [
+  ['Off', [['-', '']]],
+  ['🏴‍☠️ Pirate flag', [['Y', 'Red / pewter'], ['U', 'Creamsicle']]],
+  ['🌀 Lava swirl', [['J', 'Full color'], ['I', 'Road safe'], ['Jlp', 'Lime + purple'], ['Jgw', 'Gray, white + blue'], ['Jcb', 'Cyan + dark blue']]],
+  ['💨 Smoke face', [['G', 'Blue'], ['H', 'Drive safe'], ['Glp', 'Lime + purple'], ['Ggw', 'Gray, white + blue'], ['Gcb', 'Cyan + dark blue']]],
+  ['💨 Rolling smoke', [['Mbg', 'Blue-gray'], ['Mam', 'Amber (drive safe)'], ['Mlp', 'Lime + purple'], ['Mgw', 'Gray, white + blue'], ['Mcb', 'Cyan + dark blue']]],
+  ['🔥 Fire', [['Krd', 'Red / orange'], ['Kam', 'Amber (drive safe)'], ['Klp', 'Lime + purple'], ['Kgw', 'Gray, white + blue'], ['Kcb', 'Cyan + dark blue']]],
+  ['🔥 Fire sale', [['FS', '']]],
+  ['🐬 Dolphin', [['D', '']]], ['🌊 Beach wave', [['W', '']]], ['👀 Purple eyes', [['E', '']]], ['🎆 Fireworks', [['F', '']]], ['💧 Bouncing drop', [['B', '']]],
+  ['🕷 Halloween spider', [['S', '']]], ['🦍 Gorilla smash', [['A', '']]], ['🧨 TNT blast', [['X', '']]], ['📼 Cassette', [['Q', '']]], ['🪩 Disco ball', [['O', '']]],
+  ['🌧 Rain', [['R', '']]], ['$ Money rain', [['$', '']]], ['🧬 DNA helix', [['~', '']]], ['✦ Sparkles', [['*', '']]], ['« Arrows', [['>', '']]] ];
+const SCENES = famFlat(SCENE_FAMS);
 
 // ---------- animated thumbnails ----------
 const thumbs = new Set();
@@ -789,6 +832,33 @@ function makePicker({ options, value, thumb, onPick, label }) {
   show();
   return root;
 }
+function makeFamPicker({ fams, value, thumb, onPick, label }) {   // pick the item, then a second drop-down picks its color
+  const root = document.createElement('div'); root.className = 'famwrap';
+  const famIx = k => fams.findIndex(f => f[1].some(v => v[0] === k));
+  const famThumb = (cv, k, t) => thumb(cv, fams[+k.slice(1)][1][0][0], t);
+  const vbox = document.createElement('div'); vbox.className = 'varbox';
+  let cur = value;
+  const showColors = (fi, open) => {
+    vbox.innerHTML = '';
+    if (fi < 0 || fams[fi][1].length < 2) return;
+    const opts = fams[fi][1].map(([k, c]) => [k, c]);
+    const vp = makePicker({ options: opts, value: label ? null : cur, thumb, label: label ? 'Pick a color' : undefined,
+      onPick: k => { cur = k; onPick(k); if (label) vbox.innerHTML = ''; } });
+    const tag = document.createElement('div'); tag.className = 'vtag'; tag.textContent = 'Color';
+    vbox.append(tag, vp);
+    if (open) setTimeout(() => vp.querySelector('.ddbtn').click(), 0);
+  };
+  const fp = makePicker({ options: fams.map((f, i) => ['@' + i, f[0]]), value: !label && famIx(value) >= 0 ? '@' + famIx(value) : null,
+    thumb: famThumb, label, onPick: k => {
+      const fi = +k.slice(1), vars = fams[fi][1];
+      if (vars.length === 1) { cur = vars[0][0]; vbox.innerHTML = ''; onPick(cur); return; }
+      if (!label) { cur = vars.some(v => v[0] === cur) ? cur : vars[0][0]; onPick(cur); }
+      showColors(fi, true);
+    } });
+  root.append(fp, vbox);
+  if (!label) showColors(famIx(value), false);
+  return root;
+}
 document.addEventListener('click', e => { if (!e.target.closest('.dd')) document.querySelectorAll('.ddlist').forEach(l => l.hidden = true); });
 let loopCount = 0, sceneStart = 0;
 function onWrap(r, now) {
@@ -802,7 +872,7 @@ function sceneBox() {
   const x0 = Math.min(...gxs) * PW, y0 = Math.min(...gys) * PH;
   return [x0, y0, (Math.max(...gxs) + 1) * PW - x0, (Math.max(...gys) + 1) * PH - y0];
 }
-const SCENE_LEN = { G:10000, H:10000, J:15040, I:15040, Y:9600, U:9600, S:10000, X:7000, K:7000, N:9000, Q:7500, O:6500, Z:6500, A:8500, D:6500, '$':4500, R:5000, E:7500, F:6500, B:6500, W:11000, '~':4500, '*':4500, '>':4500 };
+const SCENE_LEN = { Glp:10000, Ggw:10000, Gcb:10000, Mbg:10000, Mam:10000, Mlp:10000, Mgw:10000, Mcb:10000, Krd:10000, Kam:10000, Klp:10000, Kgw:10000, Kcb:10000, FS:10500, Jlp:15040, Jgw:15040, Jcb:15040, G:10000, H:10000, J:15040, I:15040, Y:9600, U:9600, S:10000, X:7000, K:7000, N:9000, Q:7500, O:6500, Z:6500, A:8500, D:6500, '$':4500, R:5000, E:7500, F:6500, B:6500, W:11000, '~':4500, '*':4500, '>':4500 };
 const sceneLen = k => SCENE_LEN[k] || 4500;
 const hsh = n => { n = (n ^ 61) ^ (n >>> 16); n = Math.imul(n, 9); n ^= n >>> 4; n = Math.imul(n, 0x27d4eb2d); return (n ^ (n >>> 15)) >>> 0; };
 function shade(hexc, f) {
@@ -833,6 +903,9 @@ const LAVA_STEP = 80, LAVA_HS = 24, LAVA_LEV = [0, 0.10, 0.22, 0.38, 0.58, 0.80,
 const LAVA_PAL = {
   J: [[0, 40, 90, 255], [0.16, 150, 50, 255], [0.32, 255, 60, 200], [0.48, 255, 120, 30], [0.62, 255, 210, 40], [0.78, 40, 230, 120], [0.90, 20, 200, 230], [1, 40, 90, 255]],
   I: [[0, 30, 230, 80], [0.20, 150, 255, 40], [0.40, 255, 220, 30], [0.58, 255, 140, 20], [0.74, 255, 90, 10], [0.88, 255, 200, 120], [1, 30, 230, 80]],
+  Jlp: [[0, 140, 255, 40], [0.3, 40, 200, 60], [0.5, 160, 50, 255], [0.7, 230, 90, 255], [0.85, 90, 30, 180], [1, 140, 255, 40]],
+  Jgw: [[0, 60, 110, 255], [0.3, 200, 210, 230], [0.5, 255, 255, 255], [0.7, 110, 120, 140], [0.85, 30, 60, 200], [1, 60, 110, 255]],
+  Jcb: [[0, 0, 230, 255], [0.3, 0, 120, 220], [0.55, 10, 30, 140], [0.75, 60, 180, 255], [1, 0, 230, 255]],
 };
 const lavaColorCache = {};
 function lavaColor(type, hi, lvl) {   // fixed table: 24 hues x 6 brightness levels, so the clip stays small and exact
@@ -885,6 +958,9 @@ function drawLava(fb, t, type, x0, y0, w, h, occ, fade) {
 const SMOKE_PAL = {
   G: [[0, 10, 22, 70], [0.35, 30, 70, 170], [0.6, 70, 110, 190], [0.8, 120, 130, 150], [1, 185, 190, 205]],
   H: [[0, 40, 6, 2], [0.3, 140, 14, 6], [0.55, 215, 80, 8], [0.8, 255, 150, 18], [1, 255, 205, 110]],
+  Glp: [[0, 30, 6, 50], [0.35, 110, 30, 190], [0.6, 170, 70, 240], [0.8, 110, 220, 40], [1, 200, 255, 120]],
+  Ggw: [[0, 15, 25, 60], [0.35, 50, 80, 170], [0.6, 120, 130, 150], [0.8, 190, 195, 205], [1, 250, 250, 255]],
+  Gcb: [[0, 0, 10, 50], [0.35, 0, 40, 140], [0.6, 0, 110, 200], [0.8, 0, 200, 240], [1, 150, 250, 255]],
 };
 const SMOKE_PROF = [-2.6, -1.2, -0.3, 0.3, 0.7, 0.2, 1.2, 2.6, 4.0, 2.2, 2.1, 1.3, 1.9, 0.7, 1.1, -2.6];   // how far each row sticks out (dots), forehead to neck
 const smokeCache = {};
@@ -963,10 +1039,115 @@ function drawSmokeFace(fb, t, type, x0, y0, w, h, occ, fade) {
     }
   }
 }
+// ---------- shared helpers for the new flowing scenes ----------
+function gradRGB(P, pos) {   // P: [[pos, r, g, b], ...]
+  pos = Math.max(0, Math.min(1, pos)); let k = 0; while (k < P.length - 2 && P[k + 1][0] < pos) k++;
+  const f = (pos - P[k][0]) / (P[k + 1][0] - P[k][0] || 1); return [1, 2, 3].map(i => P[k][i] + (P[k + 1][i] - P[k][i]) * f);
+}
+const qCache = {};
+function qColor(key, P, pos, m) { const k = key + '|' + pos + '|' + m; return qCache[k] || (qCache[k] = rgbHex(gradRGB(P, pos).map(v => v * m))); }
+const ez01 = q => { q = Math.max(0, Math.min(1, q)); return q * q * (3 - 2 * q); };
+// ---------- rolling smoke: swirling smoke rolls all the way across, then dissolves ----------
+const ROLL_PAL = {
+  Mbg: SMOKE_PAL.G, Mam: [[0, 40, 20, 0], [0.35, 150, 80, 0], [0.6, 230, 140, 10], [0.8, 255, 190, 40], [1, 255, 230, 150]],
+  Mlp: SMOKE_PAL.Glp, Mgw: SMOKE_PAL.Ggw, Mcb: SMOKE_PAL.Gcb };
+function drawRollSmoke(fb, t, type, x0, y0, w, h, occ, fade) {
+  const T = t / 1000, SS = 2, TAU = 6.283185307, a = T * 0.9, wu = w / 16, P = ROLL_PAL[type];
+  const edge = w * (1 - 1.25 * ez01(T / 5.5)), roll = T * 0.22, diss = ez01((T - 6.4) / 2.6) * 0.92;
+  const inten = ez01(T / 0.5) * (1 - ez01((T - 8.4) / 1.4));
+  const n = Math.max(3, Math.round(wu / 1.2));
+  const V = [...Array(n)].map((_, i) => ({ cx: (i + 0.5) * (wu + 1) / n + 0.12 * Math.sin(a * 1.5 + i * 2.1), cy: h / 32 + 0.22 * Math.sin(a * 2 + i * 1.7), s: i % 2 ? -2.4 : 2.4 }));
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (!occ(x0 + x, y0 + y)) continue;
+    let sm = 0, sh = 0;
+    for (let sj = 0; sj < SS; sj++) for (let si = 0; si < SS; si++) {
+      const px = x + (si + 0.5) / SS - 0.5, py = y + (sj + 0.5) / SS - 0.5;
+      let uu = px / 16 + roll, vv = py / 16;
+      for (let it = 0; it < 2; it++) for (const d of V) {
+        const dx = uu - d.cx, dy = vv - d.cy, th = d.s * Math.exp(-(dx * dx + dy * dy) / 0.30), c = Math.cos(th), s = Math.sin(th);
+        uu = d.cx + dx * c - dy * s; vv = d.cy + dx * s + dy * c;
+      }
+      const rib = 0.5 + 0.5 * Math.cos(TAU * (uu + 0.5 * Math.sin(vv * 2.4 + a * 1.3)) - a * 3);
+      let g = Math.pow(Math.max(0, Math.min(1, (rib - 0.15) / 0.85)), 1.2);
+      g = Math.max(0, (g - diss) / (1 - diss));
+      const front = edge + 1.4 * Math.sin(py * 0.8 + a * 3) + (uu - roll) * 16 * 0.0;
+      const mask = ez01((px - front + 0.6) / 2.4);
+      sm += g * mask * inten; sh += Math.max(0, Math.min(1, 0.12 + 0.75 * g));
+    }
+    sm /= SS * SS; sh /= SS * SS;
+    const lvl = Math.round(Math.min(1, sm) * 7 * fade);
+    if (lvl > 0) fb[(x0 + x) + ',' + (y0 + y)] = qColor(type, P, (Math.floor(sh * 10) + 0.5) / 10, lvl / 7);
+  }
+}
+// ---------- fire: flowing flames with upward-pointed tips ----------
+const FIRE_PAL = {
+  Krd: [[0, 40, 0, 0], [0.3, 180, 20, 0], [0.55, 255, 90, 0], [0.8, 255, 180, 20], [1, 255, 240, 170]],
+  Kam: [[0, 50, 25, 0], [0.3, 170, 90, 0], [0.55, 240, 150, 0], [0.8, 255, 210, 40], [1, 255, 250, 200]],
+  Klp: [[0, 30, 0, 50], [0.3, 120, 20, 200], [0.55, 180, 80, 255], [0.8, 140, 255, 40], [1, 230, 255, 190]],
+  Kgw: [[0, 10, 20, 70], [0.3, 40, 80, 220], [0.55, 120, 140, 200], [0.8, 220, 225, 235], [1, 255, 255, 255]],
+  Kcb: [[0, 0, 5, 60], [0.3, 0, 40, 170], [0.55, 0, 120, 230], [0.8, 0, 220, 255], [1, 200, 255, 255]] };
+function fireHeat(px, py, h, T, scale) {   // 0..1 heat of the flames at a point (py = 0 is the top row)
+  if (scale <= 0) return 0;
+  const TAU = 6.283185307, yb = h - 0.5 - py, s = yb - T * 9;
+  const wx = px / 16 + 0.35 * Math.sin(s / 16 * 3.1 + px / 16 * 1.3 + T * 1.7) * (yb / h);
+  const f = 0.72 * Math.pow(0.5 + 0.5 * Math.sin(wx * TAU * 1.6 + 0.8 * Math.sin(s / 16 * 2.3 - T)), 3)   // narrow peaks = pointed tips
+          + 0.28 * Math.pow(0.5 + 0.5 * Math.sin(wx * TAU * 0.55 - T * 0.9 + 1.3), 2);   // slower swell so the flames vary in height
+  const tall = h * (0.42 + 0.6 * f) * scale;
+  const flick = 0.5 + 0.5 * Math.sin(px * 0.9 + s * 0.7) * Math.sin(px * 0.37 - s * 0.53 + T * 3);
+  return Math.max(0, Math.min(1, 1 - yb / Math.max(0.5, tall) + 0.28 * (flick - 0.5)));
+}
+function drawFire(fb, t, type, x0, y0, w, h, occ, fade) {
+  const T = t / 1000, P = FIRE_PAL[type], SS = 2, scale = ez01(T / 1.2) * (1 - ez01((T - 8.4) / 1.4));
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (!occ(x0 + x, y0 + y)) continue;
+    let ht = 0;
+    for (let sj = 0; sj < SS; sj++) for (let si = 0; si < SS; si++) ht += fireHeat(x + (si + 0.5) / SS - 0.5, y + (sj + 0.5) / SS - 0.5, h, T, scale);
+    ht /= SS * SS;
+    const hi = Math.floor(ht * 16), lvl = Math.round(7 * fade);
+    if (hi >= 1 && lvl > 0) fb[(x0 + x) + ',' + (y0 + y)] = qColor(type, P, (hi + 0.5) / 16, lvl / 7);
+  }
+}
+// ---------- fire sale: the fire burns down and leaves FIRE SALE glimmering red and orange ----------
+let fsCache = null;
+function fireSaleText(w, h) {
+  if (fsCache && fsCache.w === w && fsCache.h === h) return fsCache.m;
+  let cols = null;
+  for (const font of ['block', 'classic', 'narrow']) { for (let sz = 2; sz >= 0; sz--) { cols = bigRaster({ text:'FIRE SALE', color:'#ffffff', font, size:sz, bold:false, italic:false }, 0); if (cols.length <= w - 2) break; } if (cols.length <= w - 2) break; }
+  const m = new Set(), xo = Math.floor((w - cols.length) / 2), yo = Math.floor((h - 16) / 2);
+  cols.forEach((col, i) => col.forEach((c, y) => { if (c) m.add((xo + i) + ',' + (yo + y)); }));
+  fsCache = { w, h, m }; return m;
+}
+function drawFireSale(fb, t, type, x0, y0, w, h, occ, fade) {
+  const T = t / 1000, P = FIRE_PAL.Krd, SS = 2, M = fireSaleText(w, h);
+  const scale = ez01(T / 1.0) * (1 - ez01((T - 3.6) / 1.5)), reveal = ez01((T - 3.9) / 1.3);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (!occ(x0 + x, y0 + y)) continue;
+    let ht = 0;
+    for (let sj = 0; sj < SS; sj++) for (let si = 0; si < SS; si++) ht += fireHeat(x + (si + 0.5) / SS - 0.5, y + (sj + 0.5) / SS - 0.5, h, T, scale);
+    ht /= SS * SS;
+    if (reveal > 0) {
+      if (M.has(x + ',' + y)) {   // the letters shimmer from deep red to bright orange
+        const glim = 0.5 + 0.5 * Math.sin(x * 0.45 + y * 0.35 - T * 5), spark = Math.max(0, Math.sin(x * 1.7 + y * 2.3 + T * 9)) > 0.97 ? 0.25 : 0;
+        ht = Math.max(ht, reveal * (0.42 + 0.36 * glim + spark));
+      } else {   // little flames licking up off the tops of the letters
+        for (let d = 1; d <= 3; d++) if (M.has(x + ',' + (y + d))) {
+          const tongue = Math.pow(0.5 + 0.5 * Math.sin(x * 1.3 + T * 7 + d), 2);
+          ht = Math.max(ht, reveal * (0.55 - d * 0.16) * tongue); break;
+        }
+      }
+    }
+    const hi = Math.floor(ht * 16), lvl = Math.round(7 * fade);
+    if (hi >= 1 && lvl > 0) fb[(x0 + x) + ',' + (y0 + y)] = qColor('FS', P, (hi + 0.5) / 16, lvl / 7);
+  }
+}
 function sceneDraw(fb, t, type, x0, y0, w, h, occ) {   // draw a scene with a soft fade in and fade out
   const L = sceneLen(type), f = Math.max(0, Math.min(1, t / 250, (L - t) / 350));
   if (LAVA_PAL[type]) { drawLava(fb, t, type, x0, y0, w, h, occ || ((x, y) => x >= x0 && x < x0 + w && y >= y0 && y < y0 + h), f); return; }
-  if (SMOKE_PAL[type]) { drawSmokeFace(fb, t, type, x0, y0, w, h, occ || ((x, y) => x >= x0 && x < x0 + w && y >= y0 && y < y0 + h), f); return; }
+  const occ2 = occ || ((x, y) => x >= x0 && x < x0 + w && y >= y0 && y < y0 + h);
+  if (SMOKE_PAL[type]) { drawSmokeFace(fb, t, type, x0, y0, w, h, occ2, f); return; }
+  if (ROLL_PAL[type]) { drawRollSmoke(fb, t, type, x0, y0, w, h, occ2, f); return; }
+  if (FIRE_PAL[type]) { drawFire(fb, t, type, x0, y0, w, h, occ2, f); return; }
+  if (type === 'FS') { drawFireSale(fb, t, type, x0, y0, w, h, occ2, f); return; }
   drawScene(fb, t, type, x0, y0, w, h, occ);
   if (f < 1) for (const key in fb) fb[key] = shade(fb[key], f);
 }
@@ -1813,7 +1994,7 @@ function showScene() {
 $('showScene').onclick = () => { showScene(); if (rx && dataCh) send('SHOW'); };
 function renderScenePick() {
   const box = $('scenePick'); box.innerHTML = '';
-  box.appendChild(makePicker({ options: SCENES, value: state.scene.type, thumb: sceneThumb,
+  box.appendChild(makeFamPicker({ fams: SCENE_FAMS, value: state.scene.type, thumb: sceneThumb,
     onPick: k => { state.scene.type = k; showScene(); } }));
 }
 (function appWord() {
@@ -1869,9 +2050,9 @@ function renderBig() {
     $('bigPal').appendChild(s);
   });
   ['bigGapPick', 'bigInsPick'].forEach(id => $(id).innerHTML = '');
-  $('bigGapPick').appendChild(makePicker({ options: ANIMS, value: b.anim, thumb: animThumb,
+  $('bigGapPick').appendChild(makeFamPicker({ fams: ANIM_FAMS, value: b.anim, thumb: animThumb,
     onPick: k => { b.anim = k; resetSim(); drawPreview(); } }));
-  $('bigInsPick').appendChild(makePicker({ options: ANIMS.slice(1), value: null, thumb: animThumb, label: '+ Pick an animation to insert',
+  $('bigInsPick').appendChild(makeFamPicker({ fams: ANIM_FAMS.slice(1), value: null, thumb: animThumb, label: '+ Pick an animation to insert',
     onPick: k => { const p = Math.min(b._caret ?? b.text.length, b.text.length);
       b.text = b.text.slice(0, p) + ' {' + k + '} ' + b.text.slice(p); b._caret = p + 5;
       $('bigText').value = b.text; renderBigChips(); drawPreview(); } }));
@@ -2009,7 +2190,7 @@ function sceneClip() {
   const occupied = new Set(state.layout.map(p => p[0] + ',' + p[1]));
   const occ = (x, y) => occupied.has(Math.floor(x / PW) + ',' + Math.floor(y / PH));
   const frames = [];
-  const step = LAVA_PAL[type] || SMOKE_PAL[type] ? LAVA_STEP : SCENE_STEP;
+  const step = LAVA_PAL[type] || SMOKE_PAL[type] || ROLL_PAL[type] || FIRE_PAL[type] || type === 'FS' ? LAVA_STEP : SCENE_STEP;
   for (let t = 0; t < L; t += step) {
     const fb = {}; sceneDraw(fb, t, type, x0, y0, w, h, occ);
     const px = [];
