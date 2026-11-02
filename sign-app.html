@@ -145,6 +145,12 @@
   <h2>Big screen</h2>
   <label>Big scene graphic (whole sign)</label>
   <div id="scenePick"></div>
+  <div id="mfOpts" hidden>
+    <label>Percent off: <b id="mfPl" style="color:var(--blue)">40%</b></label>
+    <input type="range" id="mfPct" min="15" max="50" step="5" value="40">
+    <label>Color: <b id="mfCl" style="color:var(--blue)">Dollar green</b></label>
+    <input type="range" id="mfCol" min="0" max="6" step="1" value="0">
+  </div>
   <div class="row">
     <button class="sec" id="showScene">▶ Show scene now</button>
   </div>
@@ -292,6 +298,8 @@ const BIGDEF = () => ({ pages:false, hold:2.5, on:false, text:'HALF PRICE {$} CA
                         color:'#ffa000', font:'classic', size:2, bold:true, italic:false });
 function fixState(st) {
   if (!st.scene) st.scene = { type:'D', every:2 };
+  if (st.scene.pct === undefined) st.scene.pct = 40;
+  if (st.scene.mcol === undefined) st.scene.mcol = 0;
   try { if (!SCENES.some(x => x[0] === st.scene.type)) st.scene.type = '-'; } catch {}   // scene was removed from the list
   st.big = Object.assign(BIGDEF(), st.big || {});
   if (st.big.font === 'digital') st.big.font = 'tall';
@@ -761,6 +769,7 @@ const SCENE_FAMS = [
   ['💨 Rolling smoke', [['Mbg', 'Blue-gray'], ['Mam', 'Amber (drive safe)'], ['Mlp', 'Lime + purple'], ['Mgw', 'Gray, white + blue'], ['Mcb', 'Cyan + dark blue']]],
   ['🔥 Fire', [['Krd', 'Red / orange'], ['Kam', 'Amber (drive safe)'], ['Klp', 'Lime + purple'], ['Kgw', 'Gray, white + blue'], ['Kcb', 'Cyan + dark blue']]],
   ['🔥 Fire sale', [['FS', '']]],
+  ['💵 Money Flip % OFF', [['MF', '']]],
   ['🐬 Dolphin', [['D', '']]], ['🌊 Beach wave', [['W', '']]], ['👀 Purple eyes', [['E', '']]], ['🎆 Fireworks', [['F', '']]], ['💧 Bouncing drop', [['B', '']]],
   ['🕷 Halloween spider', [['S', '']]], ['🦍 Gorilla smash', [['A', '']]], ['🧨 TNT blast', [['X', '']]], ['📼 Cassette', [['Q', '']]], ['🪩 Disco ball', [['O', '']]],
   ['🌧 Rain', [['R', '']]], ['$ Money rain', [['$', '']]], ['🧬 DNA helix', [['~', '']]], ['✦ Sparkles', [['*', '']]], ['« Arrows', [['>', '']]] ];
@@ -872,7 +881,7 @@ function sceneBox() {
   const x0 = Math.min(...gxs) * PW, y0 = Math.min(...gys) * PH;
   return [x0, y0, (Math.max(...gxs) + 1) * PW - x0, (Math.max(...gys) + 1) * PH - y0];
 }
-const SCENE_LEN = { Glp:10000, Ggw:10000, Gcb:10000, Mbg:10000, Mam:10000, Mlp:10000, Mgw:10000, Mcb:10000, Krd:10000, Kam:10000, Klp:10000, Kgw:10000, Kcb:10000, FS:10500, Jlp:15040, Jgw:15040, Jcb:15040, G:10000, H:10000, J:15040, I:15040, Y:9600, U:9600, S:10000, X:7000, K:7000, N:9000, Q:7500, O:6500, Z:6500, A:8500, D:6500, '$':4500, R:5000, E:7500, F:6500, B:6500, W:11000, '~':4500, '*':4500, '>':4500 };
+const SCENE_LEN = { MF:11000, Glp:10000, Ggw:10000, Gcb:10000, Mbg:10000, Mam:10000, Mlp:10000, Mgw:10000, Mcb:10000, Krd:10000, Kam:10000, Klp:10000, Kgw:10000, Kcb:10000, FS:10500, Jlp:15040, Jgw:15040, Jcb:15040, G:10000, H:10000, J:15040, I:15040, Y:9600, U:9600, S:10000, X:7000, K:7000, N:9000, Q:7500, O:6500, Z:6500, A:8500, D:6500, '$':4500, R:5000, E:7500, F:6500, B:6500, W:11000, '~':4500, '*':4500, '>':4500 };
 const sceneLen = k => SCENE_LEN[k] || 4500;
 const hsh = n => { n = (n ^ 61) ^ (n >>> 16); n = Math.imul(n, 9); n ^= n >>> 4; n = Math.imul(n, 0x27d4eb2d); return (n ^ (n >>> 15)) >>> 0; };
 function shade(hexc, f) {
@@ -1140,6 +1149,86 @@ function drawFireSale(fb, t, type, x0, y0, w, h, occ, fade) {
     if (hi >= 1 && lvl > 0) fb[(x0 + x) + ',' + (y0 + y)] = qColor('FS', P, (hi + 0.5) / 16, lvl / 7);
   }
 }
+// ---------- Money Flip % OFF: six 3D bubble characters rise out of a green wave, flip $$$ $$$ <-> 40% OFF ----------
+const MF_COLORS = [   // [name, face, dark edge, glint]
+  ['Dollar green', [30, 185, 70], [0, 60, 18], [150, 255, 170]], ['Gold', [255, 190, 20], [110, 60, 0], [255, 240, 160]],
+  ['Silver', [200, 205, 215], [70, 75, 90], [255, 255, 255]], ['Amber (drive safe)', [255, 150, 0], [110, 50, 0], [255, 215, 120]],
+  ['Cyan', [0, 200, 240], [0, 50, 90], [170, 250, 255]], ['Purple', [150, 60, 255], [50, 10, 100], [220, 180, 255]],
+  ['Lime', [140, 255, 40], [40, 90, 0], [220, 255, 170]] ];
+const MF_SILVER = [225, 232, 240];
+const mfCache = {};
+function mfGlyph(ch) {   // bold bubble character, 11 dots tall, as a 4x-resolution coverage map
+  if (mfCache[ch]) return mfCache[ch];
+  const S = 4, capPx = 11 * S, fam = 'Arial, "Helvetica Neue", sans-serif', wt = 700;
+  const m = capMetrics(fam, wt), size = capPx / m.cap, base = capPx - m.base * size;
+  const c = document.createElement('canvas'), x = c.getContext('2d', { willReadFrequently:true });
+  c.width = capPx * 2; c.height = capPx + 2 * S;
+  x.font = `${wt} ${size}px ${fam}`; x.textBaseline = 'alphabetic'; x.fillStyle = '#fff'; x.strokeStyle = '#fff';
+  x.setTransform(0.88, 0, 0, 1, 0, 0);   // a touch narrower so six fit with room between them
+  x.fillText(ch, S, base + S * 0.5);
+  x.setTransform(1, 0, 0, 1, 0, 0);
+  const d = x.getImageData(0, 0, c.width, c.height).data;
+  let l = c.width, r = 0;
+  for (let yy = 0; yy < c.height; yy++) for (let xx = 0; xx < c.width; xx++) if (d[(yy * c.width + xx) * 4 + 3] > 60) { l = Math.min(l, xx); r = Math.max(r, xx); }
+  if (r < l) { l = 0; r = S * 6; }
+  const cw = r - l + 1, chh = c.height, cov = new Float32Array(cw * chh);
+  for (let yy = 0; yy < chh; yy++) for (let xx = 0; xx < cw; xx++) cov[yy * cw + xx] = d[(yy * c.width + xx + l) * 4 + 3] / 255;
+  return mfCache[ch] = { S, cw, chh, W: cw / S, cov };
+}
+function mfCov(g, gx, gy) {   // gx: dots from the glyph's center, gy: dots from its top
+  const sx = Math.floor((gx + g.W / 2) * g.S), sy = Math.floor(gy * g.S);
+  return sx < 0 || sy < 0 || sx >= g.cw || sy >= g.chh ? 0 : g.cov[sy * g.cw + sx];
+}
+const mixRGB = (A, B, f) => A.map((v, i) => v + (B[i] - v) * f);
+function drawMoneyFlip(fb, t, x0, y0, w, h, occ, fade) {
+  const T = t / 1000, TAU = 6.283185307, C = MF_COLORS[state.scene.mcol || 0] || MF_COLORS[0];
+  const pct = String(state.scene.pct || 40).padStart(2, '0').slice(-2);
+  const FRONT = ['$', '$', '$', '$', '$', '$'], BACK = [pct[0], pct[1], '%', 'O', 'F', 'F'];
+  const pitch = Math.min(16, 12.5 * w / 96), gap = 6 * pitch / 12.5, start = (w - (5 * pitch + gap)) / 2 + pitch / 2 - pitch / 2;
+  const top = (h - 16) / 2 + 1;
+  const surface = x => h - 2.6 + 0.6 * Math.sin(x * 0.22 - TAU * T / 11 * 3) + 0.35 * Math.sin(x * 0.53 + TAU * T / 11 * 5);
+  const rise = ez01((T - 0.4) / 1.6), sink = ez01((T - 9.6) / 1.4), lift = rise * (1 - sink);
+  // spin: a slow lazy turn while rising, then ramps up to a half-turn every 1.7 s and never stops
+  const q = Math.max(0, Math.min(1, T - 2.0)), I = T < 2 ? 0 : (q * q * q - q * q * q * q / 2) + Math.max(0, T - 3.0);
+  const u = T < 2 ? -1.2 * (1 - rise) : (Math.PI / 1.7) * I;
+  const th = u - 0.42 * Math.sin(2 * u), ct = Math.cos(th), st = Math.sin(th);
+  const sxs = Math.max(Math.abs(ct), 0.07), glint = Math.pow(1 - Math.abs(ct), 2);
+  // silver swipe: runs across each face as it opens up after every edge-on moment
+  const ph = (((th + Math.PI / 2) % Math.PI) + Math.PI) % Math.PI, p = ph / (Math.PI / 2), swOn = T > 2 && p < 1.35;
+  const ex = -0.7 - 1.6 * st * Math.sign(ct || 1), ey = 0.7;   // dark extruded edge, shifts as the character turns
+  const lit = {};
+  const put = (x, y, rgb) => { if (x < 0 || x >= w || y < 0 || y >= h || !occ(x0 + x, y0 + y)) return; lit[x + ',' + y] = rgb; };
+  for (let i = 0; i < 6; i++) {
+    const cx = start + i * pitch + (i >= 3 ? gap : 0) + 0.5;
+    const tilt = (9 * Math.sin(T * 1.3 + i * 1.7) + 3 * Math.sin(T * 0.47 + i * 2.9)) * Math.PI / 180;
+    const cy = top + 5.5 + 0.5 * Math.sin(T * 1.9 + i * 2.3) + (1 - lift) * 14;
+    const g = mfGlyph(ct >= 0 ? FRONT[i] : BACK[i]), ca = Math.cos(-tilt), sa = Math.sin(-tilt);
+    for (let y = Math.floor(cy - 8); y <= Math.ceil(cy + 8); y++) for (let x = Math.floor(cx - 9); x <= Math.ceil(cx + 9); x++) {
+      if (y < 0 || y >= h || x < 0 || x >= w) continue;
+      let fc = 0, dc = 0, sw = 0;
+      for (let sj = 0; sj < 3; sj++) for (let si = 0; si < 3; si++) {
+        const px = x + (si + 0.5) / 3 - 0.5, py = y + (sj + 0.5) / 3 - 0.5;
+        if (py >= surface(px)) continue;   // still under the green wave
+        const dx = px - cx, dy = py - cy, lx = dx * ca - dy * sa, ly = dx * sa + dy * ca;
+        const f = mfCov(g, lx / sxs, ly + 5.5);
+        if (f > 0.4) {
+          fc++;
+          if (swOn) { const dd = lx / sxs * 0.8 + ly * 0.6, sc = -9 + 19 * p; sw += Math.exp(-Math.pow((dd - sc) / 1.5, 2)) + 0.5 * Math.exp(-Math.pow((dd - sc + 3) / 0.8, 2)); }
+        } else if (Math.max(mfCov(g, (lx - 0.5 * ex) / sxs, ly - 0.5 * ey + 5.5), mfCov(g, (lx - ex) / sxs, ly - ey + 5.5)) > 0.4) dc++;
+      }
+      if (fc >= 3) {
+        const gq = Math.round(glint * 3) / 3, sq = Math.round(Math.min(1, sw / fc) * 4) / 4, cq = fc >= 7 ? 1 : fc >= 5 ? 0.8 : 0.6;
+        put(x, y, mixRGB(mixRGB(C[1], C[3], gq), MF_SILVER, sq).map(v => v * cq));
+      } else if (dc + fc >= 4) put(x, y, C[2].map(v => v * (dc >= 7 ? 1 : 0.75)));
+    }
+  }
+  for (let x = 0; x < w; x++) {   // the rolling wave line along the bottom
+    const sf = surface(x + 0.5);
+    for (let y = Math.max(0, Math.floor(sf)); y < h; y++) put(x, y, y < sf + 1 ? mixRGB(C[1], C[3], 0.25) : C[1].map(v => v * 0.7));
+  }
+  const fq = Math.round(fade * 7) / 7;
+  if (fq > 0) for (const k in lit) { const [x, y] = k.split(',').map(Number); fb[(x0 + x) + ',' + (y0 + y)] = rgbHex(lit[k].map(v => v * fq)); }
+}
 function sceneDraw(fb, t, type, x0, y0, w, h, occ) {   // draw a scene with a soft fade in and fade out
   const L = sceneLen(type), f = Math.max(0, Math.min(1, t / 250, (L - t) / 350));
   if (LAVA_PAL[type]) { drawLava(fb, t, type, x0, y0, w, h, occ || ((x, y) => x >= x0 && x < x0 + w && y >= y0 && y < y0 + h), f); return; }
@@ -1148,6 +1237,7 @@ function sceneDraw(fb, t, type, x0, y0, w, h, occ) {   // draw a scene with a so
   if (ROLL_PAL[type]) { drawRollSmoke(fb, t, type, x0, y0, w, h, occ2, f); return; }
   if (FIRE_PAL[type]) { drawFire(fb, t, type, x0, y0, w, h, occ2, f); return; }
   if (type === 'FS') { drawFireSale(fb, t, type, x0, y0, w, h, occ2, f); return; }
+  if (type === 'MF') { drawMoneyFlip(fb, t, x0, y0, w, h, occ2, f); return; }
   drawScene(fb, t, type, x0, y0, w, h, occ);
   if (f < 1) for (const key in fb) fb[key] = shade(fb[key], f);
 }
@@ -1992,10 +2082,19 @@ function showScene() {
   sceneStart = performance.now();
 }
 $('showScene').onclick = () => { showScene(); if (rx && dataCh) send('SHOW'); };
+function renderMfOpts() {   // the Money Flip sliders only show while that scene is picked
+  const on = state.scene.type === 'MF';
+  $('mfOpts').hidden = !on; if (!on) return;
+  $('mfPct').value = state.scene.pct; $('mfPl').textContent = state.scene.pct + '%';
+  $('mfCol').value = state.scene.mcol; $('mfCl').textContent = MF_COLORS[state.scene.mcol][0];
+}
+$('mfPct').oninput = e => { state.scene.pct = +e.target.value; renderMfOpts(); };
+$('mfCol').oninput = e => { state.scene.mcol = +e.target.value; renderMfOpts(); };
 function renderScenePick() {
+  renderMfOpts();
   const box = $('scenePick'); box.innerHTML = '';
   box.appendChild(makeFamPicker({ fams: SCENE_FAMS, value: state.scene.type, thumb: sceneThumb,
-    onPick: k => { state.scene.type = k; showScene(); } }));
+    onPick: k => { state.scene.type = k; renderMfOpts(); showScene(); } }));
 }
 (function appWord() {
   const cols = raster('APPLICATION', '#ffa000', 0);
