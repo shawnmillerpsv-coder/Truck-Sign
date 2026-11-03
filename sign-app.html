@@ -285,15 +285,9 @@ const COLS = 6, ROWS = 3, PW = 32, PH = 8, MAXP = 8;
 const AD = 'WHOLESALE CABINETS {$} TOP QUALITY {$} HALF THE PRICE {$} KITCHENS & BATHS';
 const PHONE = '555-123-4567';
 const L = (scroll, text, color = '#ffffff', speed = 5, gap = '1', anim = '$', font = 'classic') => ({ scroll, speed, color, text, gap, anim, font, pages:false, hold:2.5 });
-const BUILTIN = [
-  { name:'3-3 Scrolling ad', layout:[[0,0],[1,0],[2,0],[0,1],[1,1],[2,1]], lines:[L(true, AD, '#ffa000'), L(false, PHONE), L(false, '')], bright:60 },
-  { name:'3-3 Steady (driving)', layout:[[0,0],[1,0],[2,0],[0,1],[1,1],[2,1]], lines:[L(false, 'HALF PRICE CABINETS', '#ffa000'), L(false, PHONE), L(false, '')], bright:60 },
-  { name:'3-3 Tall scrolling ad', layout:[[0,0],[1,0],[2,0],[0,1],[1,1],[2,1]], lines:[L(true, AD, '#ffa000'), L(false, PHONE), L(false, '')], bright:60,
-    big:{ on:true, text:'WHOLESALE {FFFFFF}CABINETS{} {$} HALF PRICE' } },
-  { name:'4-2 Scrolling ad', layout:[[0,0],[1,0],[2,0],[3,0],[1,1],[2,1]], lines:[L(true, AD, '#ffa000'), L(false, PHONE), L(false, '')], bright:60 },
-  { name:'4-2 Steady (driving)', layout:[[0,0],[1,0],[2,0],[3,0],[1,1],[2,1]], lines:[L(false, 'WHOLESALE CABINETS', '#ffa000'), L(false, PHONE), L(false, '')], bright:60 },
-  { name:'4-2 Tall scrolling ad', layout:[[0,0],[1,0],[2,0],[3,0],[1,1],[2,1]], lines:[L(true, AD, '#ffa000'), L(false, PHONE), L(false, '')], bright:60,
-    big:{ on:true, text:'WHOLESALE {FFFFFF}CABINETS{} {$} HALF PRICE' } },
+const BUILTIN = [   // blank starting layouts in the real data-chain order, seen from outside: panel 1 is top right
+  { name:'3-3 blank (3-2-1 / 6-5-4)', layout:[[2,0],[1,0],[0,0],[2,1],[1,1],[0,1]], lines:[L(false, ''), L(false, ''), L(false, '')], bright:60, scene:{ type:'-', every:2 } },
+  { name:'4-2 blank (4-3-2-1 / 6-5)', layout:[[3,0],[2,0],[1,0],[0,0],[2,1],[1,1]], lines:[L(false, ''), L(false, ''), L(false, '')], bright:60, scene:{ type:'-', every:2 } },
 ];
 const ANIM_FAMS = [   // [name, [[key, color name], ...]] - one entry per item, a second drop-down picks the color
   ['None', [['-', '']]], ['$ Dollars', [['$', '']]], ['⭐ Gold stars', [['S', '']]], ['🪣 Paint bucket', [['B', '']]],
