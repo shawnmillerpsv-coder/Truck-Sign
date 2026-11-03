@@ -71,6 +71,11 @@
 
   .line-card .head { display:flex; justify-content:space-between; align-items:center; }
   .chip { font-size:12px; color:var(--blue); border:1px solid var(--blue); border-radius:20px; padding:2px 8px; }
+  #seqBox { margin-top:6px; }
+  .seqrow { display:flex; align-items:center; gap:8px; margin:4px 0; font-size:14px; }
+  .seqrow .seqn { opacity:.6; font-size:12px; }
+  .seqrow .seqk { flex:1; }
+  .seqrow .seqx { width:auto; flex:none; margin-top:0; padding:4px 10px; }
   .varbox { display:flex; align-items:center; gap:8px; margin-top:6px; }
   .varbox:empty { display:none; }
   .varbox .vtag { font-size:12px; opacity:.7; flex:none; }
@@ -145,6 +150,7 @@
   <h2>Big screen</h2>
   <label>Big scene graphic (whole sign)</label>
   <div id="scenePick"></div>
+  <div id="seqBox"></div>
   <div id="mfOpts" hidden>
     <label>Percent off: <b id="mfPl" style="color:var(--blue)">40%</b></label>
     <input type="range" id="mfPct" min="15" max="50" step="5" value="40">
@@ -156,6 +162,12 @@
   </div>
   <label>Play it every <b id="evl" style="color:var(--blue)">2</b> loops of the scrolling message</label>
   <input type="range" id="every" min="1" max="5" value="2">
+  <label>Play the scene <b id="rpl" style="color:var(--blue)">1×</b> in a row each time</label>
+  <div class="row" style="align-items:center">
+    <input type="range" id="rep" min="1" max="10" value="1" style="flex:1">
+    <button class="sec" id="repInf" style="flex:none;width:auto;padding:8px 14px;margin-top:0">∞ Forever</button>
+  </div>
+  <div class="hint">∞ Forever locks the scene on with no text in between. With every text line off, the scene loops on its own. (Needs sign program v3.4.)</div>
 
   <label class="chk"><input type="checkbox" id="bigOn"> Lock in tall double-line text (Line 1 + Line 2 become one)</label>
   <div id="bigBody" hidden>
@@ -300,6 +312,10 @@ function fixState(st) {
   if (!st.scene) st.scene = { type:'D', every:2 };
   if (st.scene.pct === undefined) st.scene.pct = 40;
   if (st.scene.mcol === undefined) st.scene.mcol = 0;
+  if (st.scene.rep === undefined) st.scene.rep = 1;
+  if (!Array.isArray(st.scene.more)) st.scene.more = [];
+  try { st.scene.more = st.scene.more.filter(k => k !== '-' && SCENES.some(x => x[0] === k)); } catch {}
+  if (st.scene.forever === undefined) st.scene.forever = false;
   try { if (!SCENES.some(x => x[0] === st.scene.type)) st.scene.type = '-'; } catch {}   // scene was removed from the list
   st.big = Object.assign(BIGDEF(), st.big || {});
   if (st.big.font === 'digital') st.big.font = 'tall';
@@ -770,6 +786,9 @@ const SCENE_FAMS = [
   ['🔥 Fire', [['Krd', 'Red / orange'], ['Kam', 'Amber (drive safe)'], ['Klp', 'Lime + purple'], ['Kgw', 'Gray, white + blue'], ['Kcb', 'Cyan + dark blue']]],
   ['🔥 Fire sale', [['FS', '']]],
   ['💵 Money Flip % OFF', [['MF', '']]],
+  ['🎄 Garland', [['GLb', 'Blue + white lights'], ['GLa', 'Drive safe (white + amber)']]],
+  ['🐧 Garland + penguin', [['GPb', 'Blue + white lights'], ['GPa', 'Drive safe (white + amber)']]],
+  ['🔥 Garland + fireplace glow', [['GFb', 'Blue + white lights'], ['GFa', 'Drive safe (white + amber)']]],
   ['🐬 Dolphin', [['D', '']]], ['🌊 Beach wave', [['W', '']]], ['👀 Purple eyes', [['E', '']]], ['🎆 Fireworks', [['F', '']]], ['💧 Bouncing drop', [['B', '']]],
   ['🕷 Halloween spider', [['S', '']]], ['🦍 Gorilla smash', [['A', '']]], ['🧨 TNT blast', [['X', '']]], ['📼 Cassette', [['Q', '']]], ['🪩 Disco ball', [['O', '']]],
   ['🌧 Rain', [['R', '']]], ['$ Money rain', [['$', '']]], ['🧬 DNA helix', [['~', '']]], ['✦ Sparkles', [['*', '']]], ['« Arrows', [['>', '']]] ];
@@ -881,7 +900,7 @@ function sceneBox() {
   const x0 = Math.min(...gxs) * PW, y0 = Math.min(...gys) * PH;
   return [x0, y0, (Math.max(...gxs) + 1) * PW - x0, (Math.max(...gys) + 1) * PH - y0];
 }
-const SCENE_LEN = { MF:11000, Glp:10000, Ggw:10000, Gcb:10000, Mbg:10000, Mam:10000, Mlp:10000, Mgw:10000, Mcb:10000, Krd:10000, Kam:10000, Klp:10000, Kgw:10000, Kcb:10000, FS:10500, Jlp:15040, Jgw:15040, Jcb:15040, G:10000, H:10000, J:15040, I:15040, Y:9600, U:9600, S:10000, X:7000, K:7000, N:9000, Q:7500, O:6500, Z:6500, A:8500, D:6500, '$':4500, R:5000, E:7500, F:6500, B:6500, W:11000, '~':4500, '*':4500, '>':4500 };
+const SCENE_LEN = { GLb:12000, GLa:12000, GPb:18000, GPa:18000, GFb:15000, GFa:15000, MF:11000, Glp:10000, Ggw:10000, Gcb:10000, Mbg:10000, Mam:10000, Mlp:10000, Mgw:10000, Mcb:10000, Krd:10000, Kam:10000, Klp:10000, Kgw:10000, Kcb:10000, FS:10500, Jlp:15040, Jgw:15040, Jcb:15040, G:10000, H:10000, J:15040, I:15040, Y:9600, U:9600, S:10000, X:7000, K:7000, N:9000, Q:7500, O:6500, Z:6500, A:8500, D:6500, '$':4500, R:5000, E:7500, F:6500, B:6500, W:11000, '~':4500, '*':4500, '>':4500 };
 const sceneLen = k => SCENE_LEN[k] || 4500;
 const hsh = n => { n = (n ^ 61) ^ (n >>> 16); n = Math.imul(n, 9); n ^= n >>> 4; n = Math.imul(n, 0x27d4eb2d); return (n ^ (n >>> 15)) >>> 0; };
 function shade(hexc, f) {
@@ -1229,6 +1248,196 @@ function drawMoneyFlip(fb, t, x0, y0, w, h, occ, fade) {
   const fq = Math.round(fade * 7) / 7;
   if (fq > 0) for (const k in lit) { const [x, y] = k.split(',').map(Number); fb[(x0 + x) + ',' + (y0 + y)] = rgbHex(lit[k].map(v => v * fq)); }
 }
+// ---------- holiday garland: textured boughs around the border with twinkling single-dot lights ----------
+const ghash = n => (hsh(n >>> 0) & 0xffff) / 65535;
+function gnoise(x, y, seed, sc) {
+  const xs = x / sc, ys = y / sc, xi = Math.floor(xs), yi = Math.floor(ys);
+  let fx = xs - xi, fy = ys - yi; fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
+  const h = (i, j) => ghash(i * 374761 + j * 668265 + seed * 9176);
+  return (h(xi, yi) * (1 - fx) + h(xi + 1, yi) * fx) * (1 - fy) + (h(xi, yi + 1) * (1 - fx) + h(xi + 1, yi + 1) * fx) * fy;
+}
+const GL_GREEN = [[0, 1, 18, 5], [0.55, 12, 80, 26], [1, 70, 160, 70]];
+const glCache = {};
+function garlandBase(w, h) {   // the boughs never move, so build them once per sign size
+  const key = w + 'x' + h; if (glCache[key]) return glCache[key];
+  const swL = w / Math.max(1, Math.round(w / 16)), side = 2.6, g = {}, inside = {}, interior = [];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const sw = Math.abs(Math.sin(Math.PI * (x + 0.5) / swL));
+    const topE = 2.6 + 2.0 * sw, botE = h - 3.4 - 1.0 * sw;
+    const dT = topE - y, dB = y - botE, dL = side - x, dR = x - (w - 1 - side), depth = Math.max(dT, dB, dL, dR);
+    const rag = (gnoise(x, y, 3, 1.3) - 0.5) * 1.4;
+    if (depth + rag <= 0) { interior.push([x, y]); continue; }
+    const band = depth === dT ? topE : depth === dB ? h - botE : side + 0.4, mid = band * 0.55;
+    const prof = Math.max(0, Math.min(1, 1 - Math.abs(depth - mid) / (band * 0.6 + 0.4)));
+    const needle = ghash(x * 31 + y * 17 + 5);
+    let sh = Math.max(0, Math.min(1, 0.10 + 0.55 * prof * (0.45 + 0.75 * gnoise(x, y, 7, 2.2)) + 0.25 * (gnoise(x, y, 11, 1.0) - 0.5) + 0.15 * (needle - 0.5)));
+    const q = Math.round(sh * 11) / 11;
+    g[x + ',' + y] = needle > 0.985 && prof > 0.5 ? '#6ea082' : rgbHex(gradRGB(GL_GREEN, q));
+    inside[x + ',' + y] = q;
+  }
+  const lights = [], per = 7;
+  const push = (x, y, i) => lights.push({ x: Math.round(x + (ghash(i * 7 + 1) - 0.5) * 2), y: Math.round(y), alt: i % 2 === 1, k: 2 + Math.floor(ghash(i * 13 + 3) * 4), ph: ghash(i * 29 + 7) });
+  let i = 0;
+  for (let x = 3; x < w - 3; x += per) push(x, 1.2 + 1.2 * Math.abs(Math.sin(Math.PI * (x + 0.5) / swL)), i++);
+  for (let x = 5.5; x < w - 3; x += per) push(x, h - 1.6 - 0.4 * Math.abs(Math.sin(Math.PI * (x + 0.5) / swL)), i++);
+  for (let y = 5.5; y < h - 4; y += 4.5) { push(1, y, i++); push(w - 2, y, i++); }
+  return glCache[key] = { g, inside, interior, lights, topIn: 4.6, botIn: h - 4.4 };
+}
+function drawGarland(fb, t, safe, x0, y0, w, h, occ, fade, period) {
+  const G = garlandBase(w, h), T = t / 1000, TAU = 6.283185307, fq = Math.round(fade * 7) / 7;
+  if (fq <= 0) return G;
+  const put = (x, y, c) => { if (occ(x0 + x, y0 + y)) fb[(x0 + x) + ',' + (y0 + y)] = fq < 1 ? shade(c, fq) : c; };
+  for (const k in G.g) { const [x, y] = k.split(',').map(Number); put(x, y, G.g[k]); }
+  const WHITE = [255, 248, 225], ALT = safe ? [255, 150, 10] : [40, 90, 255];
+  for (const L of G.lights) {
+    const b = Math.round((0.12 + 0.88 * Math.pow(Math.max(0, Math.sin(TAU * (T / period * L.k + L.ph))), 2)) * 6) / 6;
+    const c = L.alt ? ALT : WHITE;
+    if (L.x >= 0 && L.x < w && L.y >= 0 && L.y < h) put(L.x, L.y, rgbHex(c.map(v => v * b)));
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {   // a soft glow onto the needles around it
+      const xx = L.x + dx, yy = L.y + dy, q = G.inside[xx + ',' + yy];
+      if (q !== undefined && b >= 0.5) put(xx, yy, rgbHex(mixRGB(gradRGB(GL_GREEN, q), c, Math.round(b * 0.4 * 4) / 4)));
+    }
+  }
+  return G;
+}
+// penguin sprites: K body, W white, O orange, E eye
+const PENG_STAND = ['..KKK..', '.KWKWK.', '..WOW..', 'KKWWWKK', 'K.WWW.K', '.KWWWK.', '..KKK..', '.OO.OO.'];
+const PENG_BACK  = ['..KKK..', '.KKKKK.', '..KKK..', 'KKKKKKK', 'K.KKK.K', '.KKKKK.', '..KKK..', '.OO.OO.'];
+const PENG_SLIDE = ['..KKKKKKK...', '.KKKKKKKKKK.', 'OKEKKKKKKKKK', '.WWWWWWWWWK.', '..WWWWWWW.OO'];
+function drawSprite(put, spr, cols, cx, cy, sx, sy, rot, flipX) {   // nearest-pixel sprite with scale + rotation around its center
+  const H = spr.length, W = spr[0].length, ca = Math.cos(-rot), sa = Math.sin(-rot), R = Math.ceil(Math.max(W * Math.abs(sx), H * sy) / 1.4) + 2;
+  for (let y = Math.floor(cy - R); y <= cy + R; y++) for (let x = Math.floor(cx - R); x <= cx + R; x++) {
+    const dx = x + 0.5 - cx, dy = y + 0.5 - cy, lx = (dx * ca - dy * sa) / sx, ly = (dx * sa + dy * ca) / sy;
+    let ix = Math.floor(lx + W / 2), iy = Math.floor(ly + H / 2);
+    if (flipX) ix = W - 1 - ix;
+    if (ix < 0 || iy < 0 || ix >= W || iy >= H) continue;
+    const ch = spr[iy][ix]; if (ch !== '.' && cols[ch]) put(x, y, cols[ch]);
+  }
+}
+function drawPenguinScene(fb, t, safe, x0, y0, w, h, occ, fade) {
+  // a penguin belly-slides in and plows head-first into a snowbank, three more crash in behind him,
+  // snow fills the sign, then melts into twinkles and leaves HAPPY HOLIDAYS behind
+  const T = t / 1000, fq = Math.round(fade * 7) / 7;
+  const G = drawGarland(fb, t, safe, x0, y0, w, h, occ, fade, 18);
+  const put = (x, y, c) => { x = Math.round(x); y = Math.round(y); if (x < 0 || y < 0 || x >= w || y >= h || !occ(x0 + x, y0 + y)) return; fb[(x0 + x) + ',' + (y0 + y)] = fq < 1 ? shade(c, fq) : c; };
+  const COLS = { K: safe ? '#5a5a64' : '#4a5888', W: '#f0f0f6', O: '#ff8c00', E: '#ffffff' };
+  const SNOW = safe ? ['#e6e6e8', '#bdbdc2', '#9a9aa0'] : ['#e8eef8', '#b8c4dc', '#8c9cc0'];
+  const belly = h - 6.5, bankX = 3, bankW = 15;
+  const bankTop = x => belly + 3.5 - 6.2 * Math.exp(-Math.pow((x - bankX - 4) / 7.5, 2));   // a mound on the left
+  // where each penguin stops: the first with his head in the bank, the rest nose to tail behind him
+  const speed = 34;   // dots per second, a quick belly slide
+  const stops = [bankX + 8];
+  for (let i = 1; i < 4; i++) stops.push(stops[i - 1] + 11);
+  const arrive = [0.2 + (w + 10 - stops[0]) / speed];   // he slides straight in from off screen, no pause
+  for (let i = 1; i < 4; i++) arrive.push(arrive[i - 1] + 1.15);
+  const jolt = t2 => { let j = 0; for (let k = 1; k < 4; k++) { const d = T - arrive[k]; if (d >= 0 && d < 0.35 && k > t2) j -= 1.2 * (1 - d / 0.35); } return j; };
+  const fillStart = arrive[3] + 1.0, melt = fillStart + 3.2, buried = T > melt;   // once the snow melts they're gone
+  for (let i = 3; i >= 0 && !buried; i--) {
+    const tEnd = arrive[i], tStart = tEnd - (w + 10 - stops[i]) / speed;
+    if (T < tStart) continue;
+    let x = T < tEnd ? stops[i] + (tEnd - T) * speed : stops[i] + Math.max(0, 0.8 * Math.sin((T - tEnd) * 14) * Math.exp(-(T - tEnd) * 6));
+    if (T >= tEnd) x += jolt(i);
+    const tip = i === 0 && T >= tEnd ? -0.32 * ez01((T - tEnd) / 0.25) : 0;   // first one ends up head down, tail up
+    const lift = i === 0 && T >= tEnd ? -1.2 * ez01((T - tEnd) / 0.25) : 0;
+    drawSprite(put, PENG_SLIDE, COLS, x + 6, belly + lift, 1, 1, tip, false);
+    if (T >= tEnd && Math.floor(T * 6 + i) % 2 === 0) put(x + 11, belly + 2 + lift, COLS.O);   // feet kicking
+  }
+  // the snowbank (drawn over the first penguin's head)
+  if (!buried) for (let x = bankX; x < bankX + bankW + 6; x++) {
+    const top = bankTop(x);
+    for (let y = Math.ceil(top); y < h - 3; y++) if (y > G.topIn) put(x, y, y < top + 1 ? SNOW[0] : (x * 3 + y) % 7 === 0 ? SNOW[2] : SNOW[1]);
+  }
+  // snow puffs at every crash
+  arrive.forEach((ta, k) => {
+    const d = T - ta; if (d < 0 || d > 0.7) return;
+    const cx = k === 0 ? bankX + 9 : stops[k] - 0.5;
+    for (let i = 0; i < 9; i++) {
+      const a = -Math.PI / 2 + (ghash(k * 50 + i) - 0.5) * 2.4, v = 6 + ghash(k * 70 + i) * 6;
+      const px = cx + Math.cos(a) * v * d, py = belly - 1 + Math.sin(a) * v * d + 9 * d * d;
+      if (d < 0.6 || i % 2) put(px, py, i % 3 ? '#ffffff' : SNOW[1]);
+    }
+  });
+  // snow falls and buries everything, then melts away into twinkles
+  if (T > fillStart) {
+    const fall = Math.min(1, (T - fillStart) / 3.0);
+    for (let i = 0; i < Math.round(w * 0.7); i++) {
+      const sp = 3 + ghash(i * 3) * 3, start = fillStart + ghash(i * 7 + 2) * 2.8;
+      if (T < start || T > melt) continue;
+      const fy = (T - start) * sp - 1, fx = ghash(i * 13 + 5) * w + Math.sin(T * 2 + i) * 0.8;
+      if (fy >= 0 && fy < h) put(fx, fy, SNOW[i % 2]);
+    }
+    for (const [x, y] of G.interior) {
+      const lvl = G.botIn + 0.5 - fall * (G.botIn - G.topIn + 1.5) + 0.8 * Math.sin(x * 0.7) * (1 - fall);
+      if (y < lvl) continue;
+      const die = melt + ghash(x * 97 + y * 31) * 1.8;
+      if (T > die + 0.25) continue;
+      put(x, y, T > die ? '#ffffff' : SNOW[(x * 7 + y * 3) % 5 === 0 ? 1 : 0]);
+    }
+  }
+  // the greeting left behind: white capitals with a blue (or amber) edge
+  const txt = ez01((T - melt - 0.2) / 1.2) * (1 - ez01((T - 16.6) / 1.0));
+  if (txt > 0) {
+    const M = bannerMask('HAPPY HOLIDAYS', w, h), edge = safe ? [255, 150, 10] : [40, 100, 255], q = Math.round(txt * 6) / 6;
+    for (const k of M) { const [x, y] = k.split(',').map(Number); if (!M.has(x + ',' + (y + 1))) put(x, y + 1, rgbHex(edge.map(v => v * q))); }   // edge along the bottom of each stroke
+    for (const k of M) {
+      const [x, y] = k.split(',').map(Number), sh = 0.5 + 0.5 * Math.sin((x - (T - melt) * 16) * 0.22 - y * 0.4);
+      put(x, y, rgbHex(mixRGB([210, 225, 255], [255, 255, 255], Math.round(sh * 3) / 3).map(v => v * q)));
+    }
+  }
+}
+const bannerCache = {};
+function bannerMask(text, w, h) {   // bold italic capitals stretched to fill the space inside the garland, end to end
+  const key = text + '|' + w + 'x' + h; if (bannerCache[key]) return bannerCache[key];
+  const x0 = 3, x1 = w - 3, y0 = 4, y1 = h - 4, boxW = x1 - x0, boxH = y1 - y0;   // 90 x 8 dots on a 3-3 sign
+  const c = document.createElement('canvas'), x = c.getContext('2d', { willReadFrequently:true }), FS = 160;
+  x.font = `italic 900 ${FS}px Arial, "Helvetica Neue", sans-serif`;
+  c.width = Math.ceil(x.measureText(text).width + FS); c.height = FS * 2;
+  x.font = `italic 900 ${FS}px Arial, "Helvetica Neue", sans-serif`; x.fillStyle = '#fff'; x.textBaseline = 'middle';
+  x.fillText(text, FS / 2, FS);
+  const d = x.getImageData(0, 0, c.width, c.height).data; let l = c.width, r = 0, tp = c.height, bt = 0;
+  for (let yy = 0; yy < c.height; yy++) for (let xx = 0; xx < c.width; xx++) if (d[(yy * c.width + xx) * 4 + 3] > 100) { l = Math.min(l, xx); r = Math.max(r, xx); tp = Math.min(tp, yy); bt = Math.max(bt, yy); }
+  const m = new Set(), sxs = (r - l + 1) / boxW, sys = (bt - tp + 1) / boxH;
+  for (let yy = 0; yy < boxH; yy++) for (let xx = 0; xx < boxW; xx++) {
+    let sum = 0, n = 0;
+    for (let a = 0; a < sys; a += 3) for (let b = 0; b < sxs; b += 3) { sum += d[(Math.floor(tp + yy * sys + a) * c.width + Math.floor(l + xx * sxs + b)) * 4 + 3]; n++; }
+    if (sum / n > 110) m.add((x0 + xx) + ',' + (y0 + yy));
+  }
+  return bannerCache[key] = m;
+}
+function drawFireplaceScene(fb, t, safe, x0, y0, w, h, occ, fade) {
+  const T = t / 1000, fq = Math.round(fade * 7) / 7;
+  const G = drawGarland(fb, t, safe, x0, y0, w, h, occ, fade, 15);
+  const put = (x, y, c) => { if (!occ(x0 + x, y0 + y)) return; fb[(x0 + x) + ',' + (y0 + y)] = fq < 1 ? shade(c, fq) : c; };
+  const GLOW = safe ? [[0, 60, 25, 0], [0.4, 200, 90, 0], [0.75, 255, 160, 20], [1, 255, 235, 150]] : [[0, 70, 8, 0], [0.4, 210, 50, 0], [0.75, 255, 130, 10], [1, 255, 220, 120]];
+  const SMOKE = [[0, 50, 20, 0], [0.5, 170, 80, 10], [1, 255, 160, 60]];
+  const glowAmt = ez01(T / 1.5) * (1 - ez01((T - 6.0) / 1.8)), smokeAmt = ez01((T - 5.6) / 1.4) * (1 - ez01((T - 8.4) / 1.6));
+  const txt = ez01((T - 7.8) / 1.4) * (1 - ez01((T - 13.6) / 1.2)), M = bannerMask('HAPPY HOLIDAYS', w, h), cx = w / 2;
+  for (const [x, y] of G.interior) {
+    let best = null;
+    if (glowAmt > 0) {   // fireplace glow rising off the bottom, flickering like embers
+      const dx = (x + 0.5 - cx) / (w * 0.38), dy = (G.botIn + 1 - y) / (G.botIn - G.topIn + 2);
+      const flick = 0.75 + 0.25 * Math.sin(x * 0.9 + T * 11) * Math.sin(x * 0.37 - T * 7 + y);
+      const v = glowAmt * Math.exp(-dx * dx * 1.6) * Math.max(0, 1.05 - dy * 1.1) * flick;
+      if (v > 0.08) best = qColor('glow' + (safe ? 'a' : 'b'), GLOW, Math.round(Math.min(1, v) * 12) / 12, 1);
+    }
+    if (smokeAmt > 0) {   // the glow lifts away as warm orange smoke
+      const rise = (T - 5.6) * 3.5, u = x / 16, v = (y + rise) / 16;
+      const sw = 0.5 + 0.5 * Math.sin(u * 6 + 1.8 * Math.sin(v * 5 - T * 1.3) + T * 0.8) * Math.sin(v * 4.1 - u * 2 + T);
+      const sv = smokeAmt * Math.max(0, sw - 0.35) * 1.6;
+      if (sv > 0.12) best = qColor('fsmoke', SMOKE, Math.round(Math.min(1, sv) * 8) / 8, Math.min(1, 0.4 + sv));
+    }
+    if (best) put(x, y, best);
+  }
+  if (txt > 0) for (const k of M) {   // the greeting stays behind, with a slow golden shimmer
+    const [x, y] = k.split(',').map(Number), sh = 0.5 + 0.5 * Math.sin((x - (T - 7.8) * 18) * 0.25 - y * 0.3);
+    put(x, y, rgbHex(mixRGB([255, 170, 40], [255, 245, 210], Math.round(sh * 4) / 4).map(v => v * Math.round(txt * 6) / 6)));
+  }
+  if (glowAmt > 0.4) for (let i = 0; i < 10; i++) {   // little sparks floating up
+    const per = 1.4 + ghash(i * 5) * 0.8, ph = ((T + ghash(i * 9) * per) % per) / per;
+    const sx = Math.round(cx + (ghash(i * 17 + 3) - 0.5) * w * 0.5 + Math.sin(T * 3 + i) * 1.2), sy = Math.round(G.botIn - ph * (G.botIn - G.topIn));
+    if (ph < 0.85 && G.interior.some(p => p[0] === sx && p[1] === sy)) put(sx, sy, ph < 0.5 ? '#ffd060' : '#ff8a20');
+  }
+}
 function sceneDraw(fb, t, type, x0, y0, w, h, occ) {   // draw a scene with a soft fade in and fade out
   const L = sceneLen(type), f = Math.max(0, Math.min(1, t / 250, (L - t) / 350));
   if (LAVA_PAL[type]) { drawLava(fb, t, type, x0, y0, w, h, occ || ((x, y) => x >= x0 && x < x0 + w && y >= y0 && y < y0 + h), f); return; }
@@ -1238,6 +1447,9 @@ function sceneDraw(fb, t, type, x0, y0, w, h, occ) {   // draw a scene with a so
   if (FIRE_PAL[type]) { drawFire(fb, t, type, x0, y0, w, h, occ2, f); return; }
   if (type === 'FS') { drawFireSale(fb, t, type, x0, y0, w, h, occ2, f); return; }
   if (type === 'MF') { drawMoneyFlip(fb, t, x0, y0, w, h, occ2, f); return; }
+  if (type === 'GLb' || type === 'GLa') { drawGarland(fb, t, type === 'GLa', x0, y0, w, h, occ2, 1, 12); return; }   // loops seamlessly, so no fade
+  if (type === 'GPb' || type === 'GPa') { drawPenguinScene(fb, t, type === 'GPa', x0, y0, w, h, occ2, 1); return; }
+  if (type === 'GFb' || type === 'GFa') { drawFireplaceScene(fb, t, type === 'GFa', x0, y0, w, h, occ2, 1); return; }
   drawScene(fb, t, type, x0, y0, w, h, occ);
   if (f < 1) for (const key in fb) fb[key] = shade(fb[key], f);
 }
@@ -2000,8 +2212,11 @@ function drawPreview(now = performance.now()) {
   ctx.clearRect(0, 0, w, h);
   const ox = mx * PW * S, oy = my * PH * S;
   const fb = {};
-  const inScene = playing && sceneStart && state.scene.type !== '-' && now - sceneStart < sceneLen(state.scene.type);
-  if (inScene) sceneDraw(fb, now - sceneStart, state.scene.type, ...sceneBox(), (x, y) => occupied.has(Math.floor(x / PW) + ',' + Math.floor(y / PH)));
+  const scT = state.scene.type, scL = seqLen(), reps = state.scene.forever ? Infinity : (state.scene.rep || 1);
+  const noText = !used.some(r => state.lines[r].text && !coveredRows().has(r)) && !(state.big.on && state.big.text);
+  if (playing && !sceneStart && noText && scT !== '-') sceneStart = now;   // scene only: loop it
+  const inScene = playing && sceneStart && scT !== '-' && (noText || now - sceneStart < scL * reps);
+  if (inScene) seqDraw(fb, (now - sceneStart) % scL, ...sceneBox(), (x, y) => occupied.has(Math.floor(x / PW) + ',' + Math.floor(y / PH)));
   else if (sceneStart) { sceneStart = 0; used.forEach(r => lastStep[r] = now); }
   const covered = coveredRows();
   if (!inScene) used.forEach(r => {
@@ -2083,18 +2298,36 @@ function showScene() {
 }
 $('showScene').onclick = () => { showScene(); if (rx && dataCh) send('SHOW'); };
 function renderMfOpts() {   // the Money Flip sliders only show while that scene is picked
-  const on = state.scene.type === 'MF';
+  const on = state.scene.type === 'MF' || (state.scene.more || []).includes('MF');
   $('mfOpts').hidden = !on; if (!on) return;
   $('mfPct').value = state.scene.pct; $('mfPl').textContent = state.scene.pct + '%';
   $('mfCol').value = state.scene.mcol; $('mfCl').textContent = MF_COLORS[state.scene.mcol][0];
 }
 $('mfPct').oninput = e => { state.scene.pct = +e.target.value; renderMfOpts(); };
 $('mfCol').oninput = e => { state.scene.mcol = +e.target.value; renderMfOpts(); };
-function renderScenePick() {
+function renderSeq() {
   renderMfOpts();
+  const box = $('seqBox'); box.innerHTML = '';
+  if (state.scene.type === '-') return;
+  const name = k => (SCENES.find(x => x[0] === k) || [k, k])[1];
+  state.scene.more.forEach((k, i) => {
+    const row = document.createElement('div'); row.className = 'seqrow';
+    row.innerHTML = '<span class="seqn">then</span><span class="seqk"></span><button class="sec seqx" type="button">✕</button>';
+    row.querySelector('.seqk').textContent = name(k);
+    row.querySelector('.seqx').onclick = () => { state.scene.more.splice(i, 1); renderSeq(); };
+    box.appendChild(row);
+  });
+  if (state.scene.more.length < 5) box.appendChild(makeFamPicker({ fams: SCENE_FAMS.slice(1), value: null, thumb: sceneThumb, label: '+ Add another scene after it',
+    onPick: k => { state.scene.more.push(k); renderSeq(); showScene(); } }));
+  const tot = document.createElement('div'); tot.className = 'hint';
+  tot.textContent = state.scene.more.length ? 'Plays back to back as one scene: about ' + Math.round(seqLen() / 1000) + ' seconds.' : 'Stack up to 6 scenes to play back to back.';
+  box.appendChild(tot);
+}
+function renderScenePick() {
+  renderMfOpts(); renderSeq();
   const box = $('scenePick'); box.innerHTML = '';
   box.appendChild(makeFamPicker({ fams: SCENE_FAMS, value: state.scene.type, thumb: sceneThumb,
-    onPick: k => { state.scene.type = k; renderMfOpts(); showScene(); } }));
+    onPick: k => { state.scene.type = k; renderMfOpts(); renderSeq(); showScene(); } }));
 }
 (function appWord() {
   const cols = raster('APPLICATION', '#ffa000', 0);
@@ -2185,7 +2418,7 @@ function renderAll() {
   renderGrid(); renderBig(); renderLines(); resetSim();
   $('bright').value = state.bright; setGauge(state.bright);
   renderScenePick();
-  $('every').value = state.scene.every; $('evl').textContent = state.scene.every;
+  $('every').value = state.scene.every; $('evl').textContent = state.scene.every; renderRep();
   drawPreview();
 }
 
@@ -2284,14 +2517,21 @@ function bigClip() {
   for (let i = 0; i < n; i++) { const t = i * CLIP_MS; frames.push(colsToFrame(cycleCols(bigRaster(b, t), 16, W, b.scroll, b.gap, b.anim, t), 16)); }
   return encodeClip(frames, CLIP_MS);
 }
+// ---------- stacked scenes: the first scene, then any added after it, played back to back as one clip ----------
+const slowStep = k => !!(LAVA_PAL[k] || SMOKE_PAL[k] || ROLL_PAL[k] || FIRE_PAL[k] || k === 'FS' || /^G[LPF]/.test(k));
+function sceneSeq() { return state.scene.type === '-' ? [] : [state.scene.type, ...(state.scene.more || [])]; }
+function seqLen(seq = sceneSeq()) { return seq.reduce((a, k) => a + sceneLen(k), 0) || 1; }
+function seqDraw(fb, t, x0, y0, w, h, occ, seq = sceneSeq()) {
+  for (const k of seq) { const L = sceneLen(k); if (t < L) { sceneDraw(fb, t, k, x0, y0, w, h, occ); return; } t -= L; }
+}
 function sceneClip() {
-  const [x0, y0, w, h] = sceneBox(), type = state.scene.type, L = sceneLen(type);
+  const seq = sceneSeq(), [x0, y0, w, h] = sceneBox(), L = seqLen(seq);
   const occupied = new Set(state.layout.map(p => p[0] + ',' + p[1]));
   const occ = (x, y) => occupied.has(Math.floor(x / PW) + ',' + Math.floor(y / PH));
   const frames = [];
-  const step = LAVA_PAL[type] || SMOKE_PAL[type] || ROLL_PAL[type] || FIRE_PAL[type] || type === 'FS' ? LAVA_STEP : SCENE_STEP;
+  const step = seq.every(slowStep) ? LAVA_STEP : SCENE_STEP;   // one frame speed for the whole stack
   for (let t = 0; t < L; t += step) {
-    const fb = {}; sceneDraw(fb, t, type, x0, y0, w, h, occ);
+    const fb = {}; seqDraw(fb, t, x0, y0, w, h, occ, seq);
     const px = [];
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) px.push(fb[(x0 + x) + ',' + (y0 + y)] || null);
     frames.push({ w, h, px });
@@ -2336,8 +2576,12 @@ $('send').onclick = async () => {
     if (bigOn) files.push(['big', bigClip()]);
     cmds.push(`LINE:3,${bigOn ? 1 : 0},${b.pages ? 'P' : b.scroll ? 'S' : 'T'},${stepMs(b.speed).toFixed(1)},0`);
     const scOn = state.scene.type !== '-';
-    if (scOn) files.push(['scn', sceneClip()]);
-    cmds.push(`SCENE:${scOn ? 1 : 0},${state.scene.every}`);
+    if (scOn) {
+      const sc = sceneClip();
+      if (sc.length > 1100 * 1024) { alert('That stack of scenes is ' + Math.round(sc.length / 1024) + ' KB, more than the sign can store (about 1100 KB). Remove a scene and try again.'); throw new Error('scene stack too big'); }
+      files.push(['scn', sc]);
+    }
+    cmds.push(`SCENE:${scOn ? 1 : 0},${state.scene.every},${state.scene.forever ? 0 : state.scene.rep}`);
     cmds.push('BRIGHT:' + state.bright);
     const total = files.reduce((s, f) => sentHash[f[0]] === hashBytes(f[1]) ? s : s + f[1].length, 0) || 1;
     $('prog').hidden = false; $('progbar').style.width = '0%';
@@ -2354,6 +2598,13 @@ $('send').onclick = async () => {
   setTimeout(() => $('prog').hidden = true, 1500);
 };
 $('every').oninput = e => { state.scene.every = +e.target.value; $('evl').textContent = state.scene.every; };
+function renderRep() {
+  $('rep').value = state.scene.rep; $('rep').disabled = state.scene.forever;
+  $('rpl').textContent = state.scene.forever ? '∞ (forever)' : state.scene.rep + '×';
+  $('repInf').className = state.scene.forever ? '' : 'sec';
+}
+$('rep').oninput = e => { state.scene.rep = +e.target.value; state.scene.forever = false; renderRep(); };
+$('repInf').onclick = () => { state.scene.forever = !state.scene.forever; renderRep(); };
 $('test').onclick = () => send('TEST');
 $('get').onclick = () => send('GET');
 
