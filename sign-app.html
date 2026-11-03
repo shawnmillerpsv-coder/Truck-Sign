@@ -229,6 +229,8 @@
     </svg>
   </div>
   <input type="range" id="bright" min="5" max="100" value="60">
+  <label class="chk"><input type="checkbox" id="gamma"> True-color mode (deeper reds and darks on the LEDs)</label>
+  <div class="hint">LEDs show dim colors brighter than a phone screen, so dark reds can look pink. This corrects colors when they're sent to the sign. Try it on the real sign; the preview here doesn't change.</div>
 </div>
 
 <div id="lines"></div>
@@ -294,7 +296,13 @@ const ANIM_FAMS = [   // [name, [[key, color name], ...]] - one entry per item, 
   ['〰 Wave', [['~', '']]], ['🐬 Dolphin', [['D', '']]], ['✦ Sparkle', [['*', '']]], ['» Arrows', [['>', '']]],
   ['■ Box Man', [['g', 'Green'], ['r', 'Red'], ['y', 'Yellow'], ['b', 'Blue']]],
   ['👻 Ghost', [['G', 'White'], ['V', 'Purple']]],
-  ['🧨 TNT', [['T', '']]], ['👟 Dancing shoes', [['M', '']]], ['🔨 Hammer', [['H', '']]], ['🚪 Cabinet door', [['C', '']]], ['❤ Heart', [['L', '']]] ];
+  ['🧨 TNT', [['T', '']]], ['👟 Dancing shoes', [['M', '']]], ['🔨 Hammer', [['H', '']]], ['🚪 Cabinet door', [['C', '']]], ['❤ Heart', [['L', '']]],
+  ['🍁 Maple leaf', [['m', '']]], ['🦃 Turkey', [['t', '']]], ['🎃 Pumpkin', [['p', '']]], ['🥧 Pie slice', [['q', '']]], ['🌰 Acorn', [['a', '']]], ['🌾 Wheat', [['w', '']]],
+  ['💡 Christmas lights', [['l', 'Multicolor'], ['k', 'White + amber (drive safe)'], ['j', 'Warm white']]],
+  ['✦ Star', [['s', 'Silver'], ['S', 'Gold']]], ['🔔 Bell', [['e', 'Silver'], ['E', 'Gold']]],
+  ['🌿 Holly', [['h', 'Red berries'], ['i', 'Amber berries (drive safe)']]],
+  ['❄ Snowflake', [['f', 'White'], ['F', 'Ice blue']]], ['🎄 Wreath', [['W', 'Red bow'], ['X', 'Gold bow']]],
+  ['🎁 Present', [['R', 'Red'], ['N', 'Green'], ['O', 'Blue'], ['Q', 'Gold']]], ['🌲 Tree with star', [['Z', '']]], ['🥂 Champagne', [['c', '']]] ];
 const famFlat = F => F.flatMap(([n, v]) => v.map(([k, c]) => [k, c ? n + ' (' + c.toLowerCase() + ')' : n]));
 const ANIMS = famFlat(ANIM_FAMS);
 const GAPS = ['B', '3', '2', '1', '0'];   // slider left -> right
@@ -462,7 +470,7 @@ function renderLines() {
     c.querySelector('.m1').onclick = () => { ln.scroll = true; ln.pages = false; renderLines(); resetSim(); drawPreview(); };
     c.querySelector('.m2').onclick = () => { ln.pages = true; ln.scroll = false; renderLines(); resetSim(); drawPreview(); };
     c.querySelector('.hs').oninput = e => { ln.hold = +e.target.value; c.querySelector('.hl').textContent = ln.hold + 's'; resetSim(); drawPreview(); };
-    c.querySelector('.pagePick').appendChild(makePicker({ options: PAGE_TRANS, value: null, thumb: transThumb, label: '+ Page break',
+    c.querySelector('.pagePick').appendChild(makeFamPicker({ fams: PAGE_FAMS, value: null, thumb: transThumb, label: '+ Page break',
       onPick: k => { const p = Math.min(ln._caret ?? ln.text.length, ln.text.length);
         ln.text = ln.text.slice(0, p) + ' {:' + k + '} ' + ln.text.slice(p); ln._caret = p + k.length + 5; t.value = ln.text;
         if (colorRow === r) renderChips(); resetSim(); drawPreview(); } }));
@@ -594,6 +602,7 @@ $('clearC').onclick = () => paint(null);
 // ---------- brightness gauge ----------
 function setGauge(v) { $('gval').textContent = v; $('garc').setAttribute('stroke-dasharray', v + ' 100'); }
 $('bright').oninput = e => { state.bright = +e.target.value; setGauge(state.bright); drawPreview(); };
+$('gamma').onchange = e => { state.gamma = e.target.checked; };
 
 // ---------- preview renderer ----------
 const DIG = [[6,9,9,9,9,9,6],[2,6,2,2,2,2,7],[6,9,1,2,4,8,15],[14,1,1,6,1,1,14],[9,9,9,15,1,1,1],
@@ -661,7 +670,7 @@ function glyph(ch) {   // fixed dot fonts: 5x7 capitals/numbers/punctuation, 4x8
   cols.push(Array(8).fill(false));
   return glyphCache[ch] = cols;
 }
-const ANIMW = { S:20, B:18, '$':20, '~':18, 'D':22, '*':14, '>':16, P:22, g:22, r:22, y:22, b:22, G:12, V:12, T:14, M:16, H:14, C:12, L:10 };
+const ANIMW = { m:12, t:14, p:11, q:11, a:9, w:9, l:20, k:20, j:20, s:20, e:11, E:11, h:12, i:12, f:11, F:11, W:11, X:11, R:11, N:11, O:11, Q:11, Z:11, c:12, S:20, B:18, '$':20, '~':18, 'D':22, '*':14, '>':16, P:22, g:22, r:22, y:22, b:22, G:12, V:12, T:14, M:16, H:14, C:12, L:10 };
 const DOLPHIN = [0b0000100000, 0b0001110000, 0b1011111110, 0b0111111111, 0b1000011000];
 function hsvToHex(hue255) {   // FastLED-style hue (0-255), full saturation
   const h = hue255 / 255 * 360, f = n => { const k = (n + h / 60) % 6; return Math.round(255 * (1 - Math.max(0, Math.min(k, 4 - k, 1)))); };
@@ -670,7 +679,64 @@ function hsvToHex(hue255) {   // FastLED-style hue (0-255), full saturation
 function animCols(a, now) {   // -> columns of 8 colors|null, same math as the firmware
   const w = ANIMW[a], g = [...Array(w)].map(() => Array(8).fill(null));
   const set = (x, y, c) => { if (x >= 0 && x < w && y >= 0 && y < 8) g[x][y] = c; };
-  if (a === 'S') {   // two gold stars bobbing up and down out of step
+  const art = (rows, pal, dx = 0, dy = 0) => rows.forEach((r, y) => [...r].forEach((ch, x) => { if (ch !== '.' && pal[ch]) set(dx + x, dy + y, pal[ch]); }));
+  if (a === 'm') {   // maple leaf tumbling side to side as it drifts, cycling orange, rust and gold
+    const C = ['#ff7a00', '#c84a10', '#ffb020'][Math.floor(now / 900) % 3], sway = Math.round(Math.sin(now * 0.004) * 2), bob = Math.round(Math.sin(now * 0.008));
+    const flip = Math.sin(now * 0.004) < 0;
+    const LEAF = ['....#....', '.#..#..#.', '.##.#.##.', '#########', '.#######.', '..#####..', '...###...', '....#....'];
+    art(flip ? LEAF.map(r => [...r].reverse().join('')) : LEAF, { '#': C }, 1 + sway, bob);
+    set(5 + sway, 7 + bob, '#7a3a10');
+  } else if (a === 't') {   // turkey with a fanned tail, bobbing its head
+    const bob = Math.floor(now / 300) % 2;
+    art(['..r.o.y.r...', '.rroooyyrr..', 'rrooo...yrr.', 'roo..bbb..r.', 'ro..bbbbbW..', '...bbbbbbWO.', '....bbbb.R..', '.....y..y...'],
+        { r:'#c03010', o:'#ff8a00', y:'#ffd040', b:'#7a4a20', W:'#ffffff', O:'#ffa000', R:'#e01010' }, 1, 0);
+    if (bob) { set(10, 4, null); }
+  } else if (a === 'p') {   // pumpkin with a curly stem
+    art(['....gg.....', '.....g.....', '..ooooooo..', '.oOoOoOoOo.', 'ooOoOoOoOoo', 'ooOoOoOoOoo', '.oOoOoOoOo.', '..ooooooo..'], { g:'#30a030', o:'#ff7000', O:'#c85000' });
+    if (Math.floor(now / 500) % 2) set(7, 0, '#30a030');
+  } else if (a === 'q') {   // slice of pie with a dot of whipped cream
+    art(['.....W.....', '....WWW....', '...ccccc...', '..cfffffc..', '.cfffffffc.', 'cfffffffffc', 'ccccccccccc', '...........'], { W:'#ffffff', c:'#d89040', f:'#b85a10' });
+    if (Math.floor(now / 400) % 3 === 0) set(6, 0, '#ffffff');
+  } else if (a === 'a') {   // acorn, rocking gently
+    const r = Math.round(Math.sin(now * 0.006));
+    art(['....g....', '..ccccc..', '.ccCcCcc.', '.bbbbbbb.', '.bBbbbBb.', '..bbbbb..', '...bbb...', '....b....'], { g:'#5a3a10', c:'#8a5a20', C:'#a87030', b:'#c88030', B:'#e0a050' }, r, 0);
+  } else if (a === 'w') {   // wheat stalk swaying in the breeze
+    const sw = Math.round(Math.sin(now * 0.005) * 1.4);
+    for (let y = 0; y < 8; y++) { const x = 4 + Math.round(sw * (1 - y / 7)); set(x, y, y < 5 ? '#e8c050' : '#a08030'); if (y < 5 && y % 2 === 0) { set(x - 1, y + 1, '#d8b040'); set(x + 1, y + 1, '#d8b040'); } }
+  } else if ('lkj'.includes(a)) {   // a string of Christmas lights, bulbs chasing
+    const BC = a === 'l' ? ['#ff2020', '#20d040', '#3060ff', '#ffc000'] : a === 'k' ? ['#ffffff', '#ff9000'] : ['#ffe0a0'], step = Math.floor(now / 220);
+    for (let x = 0; x < w; x++) { const y = Math.round(2.5 + Math.sin(x * 0.42) * 1.5); set(x, y, '#2a5030'); if (x % 4 === 1) { const i = Math.floor(x / 4), on = (i + step) % 3 !== 0; const c = BC[i % BC.length]; set(x, y + 1, on ? c : shade(c, 0.25)); set(x, y + 2, on ? c : shade(c, 0.25)); } }
+  } else if (a === 's') {   // two silver stars bobbing, with a glint
+    const STAR = ['...#...', '..###..', '#######', '.#####.', '..###..', '.##.##.', '.#...#.'];
+    for (let i = 0; i < 2; i++) {
+      const beat = (Math.floor(now / 250) + i) % 2, x0 = 2 + i * 9, tw = Math.floor(now / 125 + i * 3) % 6;
+      STAR.forEach((r, y) => [...r].forEach((ch, x) => { if (ch === '#') set(x0 + x, y + beat, y < 3 && x === 3 ? '#ffffff' : (x === 0 || x === 6 || y === 6) ? '#8890a0' : '#c8ccd8'); }));
+      if (tw === 0) set(x0 + 3, beat, '#ffffff');
+    }
+  } else if (a === 'e' || a === 'E') {   // bell swinging and ringing
+    const C = a === 'e' ? ['#d0d4dc', '#8890a0', '#ffffff'] : ['#ffc020', '#b07800', '#fff0a0'], sw = Math.round(Math.sin(now * 0.008) * 1.2);
+    art(['....h....', '...bbb...', '..bBbbb..', '..bBbbb..', '.bBbbbbb.', '.bBbbbbb.', 'bbbbbbbbb', '....c....'], { h:C[1], b:C[0], B:C[2], c:C[1] }, sw + 1, 0);
+  } else if (a === 'h' || a === 'i') {   // two holly leaves with two berries
+    const B = a === 'h' ? '#ff1010' : '#ff9000', glow = Math.floor(now / 600) % 2;
+    art(['G..G..G.....', 'GGGGGG......', '.GGGGGG.....', '..GGGGBB....', '.....BBgggg.', '....gggggg..', '...g..g..g..', '............'], { G:'#108030', g:'#20a040', B: glow ? B : shade(B, 0.7) });
+  } else if (a === 'f' || a === 'F') {   // snowflake slowly turning between two shapes
+    const C = a === 'f' ? '#ffffff' : '#a0e0ff', alt = Math.floor(now / 500) % 2;
+    art(alt ? ['....#....', '.#..#..#.', '..#.#.#..', '...###...', '#########', '...###...', '..#.#.#..', '.#..#..#.'] : ['....#....', '..#.#.#..', '.#.###.#.', '..#####..', '#########', '..#####..', '.#.###.#.', '..#.#.#..'], { '#': C }, 1, 0);
+  } else if (a === 'W' || a === 'X') {   // wreath with a bow
+    const bow = a === 'W' ? '#ff1010' : '#ffb000', tw = Math.floor(now / 300) % 4;
+    art(['..GGGGG..', '.GgGgGgG.', 'GgG...GgG', 'GG.....GG', 'GgG...GgG', '.GgGgGgG.', '..GbbbG..', '...b.b...'], { G:'#107030', g:'#30a040', b:bow }, 1, 0);
+    set(2 + tw * 2, 1, '#ffe080');
+  } else if ('RNOQ'.includes(a)) {   // present box whose lid pops up
+    const C = { R:'#e01010', N:'#10a030', O:'#2050ff', Q:'#ffb000' }[a], rib = a === 'Q' ? '#e01010' : '#ffd040', pop = Math.floor(now / 700) % 3 === 0 ? 1 : 0;
+    art(['.r...r...', '..r.r....', '.LLLLLLL.', '.LLLrLLL.'], { r:rib, L:C }, 1, -pop);
+    art(['..BBrBB..', '..BBrBB..', '..BBrBB..', '..BBrBB..'].map(r => r.replace(/^../, '.B').replace(/..$/, 'B.')), { B:C, r:rib }, 0, 4);
+  } else if (a === 'Z') {   // little tree with a blinking star
+    const st = Math.floor(now / 400) % 2;
+    art(['....Y....', '...GGG...', '..GGoGG..', '..GGGGG..', '.GGrGGbG.', 'GGGGGGGGG', '....t....', '....t....'], { Y: st ? '#fff080' : '#c0a020', G:'#108030', o: st ? '#ffc000' : '#108030', r:'#ff2020', b:'#ffffff', t:'#6a3a10' }, 1, 0);
+  } else if (a === 'c') {   // champagne glass with bubbles rising
+    art(['............', '.w......w...', '.wccccccw...', '..wccccw....', '...wccw.....', '....ww......', '....ww......', '..wwwwww....'], { w:'#c8d0dc', c:'#ffd860' });
+    for (let i = 0; i < 4; i++) { const ph = ((now / 700 + i * 0.27) % 1); set(3 + i, Math.round(2 - ph * 3 + 1) , ph < 0.7 ? '#fff6c0' : null); set(9 + (i % 2), Math.round(6 - ph * 7), '#ffffff'); }
+  } else if (a === 'S') {   // two gold stars bobbing up and down out of step
     const STAR = ['...#...', '..###..', '#######', '.#####.', '..###..', '.##.##.', '.#...#.'];
     for (let i = 0; i < 2; i++) {
       const beat = (Math.floor(now / 250) + i) % 2, x0 = 2 + i * 9, tw = Math.floor(now / 125 + i * 3) % 6;
@@ -783,6 +849,8 @@ const SCENE_FAMS = [
   ['🎄 Garland', [['GLb', 'Blue + white lights'], ['GLa', 'Drive safe (white + amber)']]],
   ['🐧 Garland + penguin', [['GPb', 'Blue + white lights'], ['GPa', 'Drive safe (white + amber)']]],
   ['🔥 Garland + fireplace glow', [['GFb', 'Blue + white lights'], ['GFa', 'Drive safe (white + amber)']]],
+  ['🍁 Fall Sale (falling leaves)', [['FL', '']]], ['🦃 Turkey + Happy Thanksgiving', [['TK', '']]], ['⛄ Snowman', [['SN', '']]],
+  ['💻 Digital rain % OFF', [['DRG', 'Green'], ['DRC', 'Cyan'], ['DRA', 'Amber'], ['DRP', 'Purple'], ['DRW', 'White'], ['DRY', 'Gold']]],
   ['🐬 Dolphin', [['D', '']]], ['🌊 Beach wave', [['W', '']]], ['👀 Purple eyes', [['E', '']]], ['🎆 Fireworks', [['F', '']]], ['💧 Bouncing drop', [['B', '']]],
   ['🕷 Halloween spider', [['S', '']]], ['🦍 Gorilla smash', [['A', '']]], ['🧨 TNT blast', [['X', '']]], ['📼 Cassette', [['Q', '']]], ['🪩 Disco ball', [['O', '']]],
   ['🌧 Rain', [['R', '']]], ['$ Money rain', [['$', '']]], ['🧬 DNA helix', [['~', '']]], ['✦ Sparkles', [['*', '']]], ['« Arrows', [['>', '']]] ];
@@ -894,7 +962,7 @@ function sceneBox() {
   const x0 = Math.min(...gxs) * PW, y0 = Math.min(...gys) * PH;
   return [x0, y0, (Math.max(...gxs) + 1) * PW - x0, (Math.max(...gys) + 1) * PH - y0];
 }
-const SCENE_LEN = { GLb:12000, GLa:12000, GPb:18000, GPa:18000, GFb:15000, GFa:15000, MF:11000, Glp:10000, Ggw:10000, Gcb:10000, Mbg:10000, Mam:10000, Mlp:10000, Mgw:10000, Mcb:10000, Krd:10000, Kam:10000, Klp:10000, Kgw:10000, Kcb:10000, FS:10500, Jlp:15040, Jgw:15040, Jcb:15040, G:10000, H:10000, J:15040, I:15040, Y:9600, U:9600, S:10000, X:7000, K:7000, N:9000, Q:7500, O:6500, Z:6500, A:8500, D:6500, '$':4500, R:5000, E:7500, F:6500, B:6500, W:11000, '~':4500, '*':4500, '>':4500 };
+const SCENE_LEN = { FL:14000, TK:15500, SN:15500, DRG:10000, DRC:10000, DRA:10000, DRP:10000, DRW:10000, DRY:10000, GLb:12000, GLa:12000, GPb:18000, GPa:18000, GFb:15000, GFa:15000, MF:11000, Glp:10000, Ggw:10000, Gcb:10000, Mbg:10000, Mam:10000, Mlp:10000, Mgw:10000, Mcb:10000, Krd:10000, Kam:10000, Klp:10000, Kgw:10000, Kcb:10000, FS:10500, Jlp:15040, Jgw:15040, Jcb:15040, G:10000, H:10000, J:15040, I:15040, Y:9600, U:9600, S:10000, X:7000, K:7000, N:9000, Q:7500, O:6500, Z:6500, A:8500, D:6500, '$':4500, R:5000, E:7500, F:6500, B:6500, W:11000, '~':4500, '*':4500, '>':4500 };
 const sceneLen = k => SCENE_LEN[k] || 4500;
 const hsh = n => { n = (n ^ 61) ^ (n >>> 16); n = Math.imul(n, 9); n ^= n >>> 4; n = Math.imul(n, 0x27d4eb2d); return (n ^ (n >>> 15)) >>> 0; };
 function shade(hexc, f) {
@@ -1380,23 +1448,246 @@ function drawPenguinScene(fb, t, safe, x0, y0, w, h, occ, fade) {
   }
 }
 const bannerCache = {};
-function bannerMask(text, w, h) {   // bold italic capitals stretched to fill the space inside the garland, end to end
-  const key = text + '|' + w + 'x' + h; if (bannerCache[key]) return bannerCache[key];
-  const x0 = 3, x1 = w - 3, y0 = 4, y1 = h - 4, boxW = x1 - x0, boxH = y1 - y0;   // 90 x 8 dots on a 3-3 sign
-  const c = document.createElement('canvas'), x = c.getContext('2d', { willReadFrequently:true }), FS = 160;
-  x.font = `italic 900 ${FS}px Arial, "Helvetica Neue", sans-serif`;
-  c.width = Math.ceil(x.measureText(text).width + FS); c.height = FS * 2;
-  x.font = `italic 900 ${FS}px Arial, "Helvetica Neue", sans-serif`; x.fillStyle = '#fff'; x.textBaseline = 'middle';
-  x.fillText(text, FS / 2, FS);
+function textMask(text, x0, x1, y0, y1, italic = true, stretch = true) {   // bold capitals fitted into a box of dots
+  const key = [text, x0, x1, y0, y1, italic, stretch].join('|'); if (bannerCache[key]) return bannerCache[key];
+  const boxW = x1 - x0, boxH = y1 - y0, FS = 160, font = `${italic ? 'italic ' : ''}900 ${FS}px Arial, "Helvetica Neue", sans-serif`;
+  const c = document.createElement('canvas'), x = c.getContext('2d', { willReadFrequently:true });
+  x.font = font; c.width = Math.ceil(x.measureText(text).width + FS); c.height = FS * 2;
+  x.font = font; x.fillStyle = '#fff'; x.textBaseline = 'middle'; x.fillText(text, FS / 2, FS);
   const d = x.getImageData(0, 0, c.width, c.height).data; let l = c.width, r = 0, tp = c.height, bt = 0;
   for (let yy = 0; yy < c.height; yy++) for (let xx = 0; xx < c.width; xx++) if (d[(yy * c.width + xx) * 4 + 3] > 100) { l = Math.min(l, xx); r = Math.max(r, xx); tp = Math.min(tp, yy); bt = Math.max(bt, yy); }
-  const m = new Set(), sxs = (r - l + 1) / boxW, sys = (bt - tp + 1) / boxH;
-  for (let yy = 0; yy < boxH; yy++) for (let xx = 0; xx < boxW; xx++) {
+  let outW = boxW;
+  if (!stretch) outW = Math.min(boxW, Math.round((r - l + 1) / (bt - tp + 1) * boxH * 1.15));
+  const ox = x0 + Math.floor((boxW - outW) / 2), m = new Set(), sxs = (r - l + 1) / outW, sys = (bt - tp + 1) / boxH;
+  for (let yy = 0; yy < boxH; yy++) for (let xx = 0; xx < outW; xx++) {
     let sum = 0, n = 0;
     for (let a = 0; a < sys; a += 3) for (let b = 0; b < sxs; b += 3) { sum += d[(Math.floor(tp + yy * sys + a) * c.width + Math.floor(l + xx * sxs + b)) * 4 + 3]; n++; }
-    if (sum / n > 110) m.add((x0 + xx) + ',' + (y0 + yy));
+    if (sum / n > 110) m.add((ox + xx) + ',' + (y0 + yy));
   }
   return bannerCache[key] = m;
+}
+const bannerMask = (text, w, h) => textMask(text, 3, w - 3, 4, h - 4);   // between the garlands, end to end
+function draw3DText(put, M, face, edge, q, shimmerT) {   // the double-layer look: face color with an edge along the bottom of each stroke
+  for (const k of M) { const [x, y] = k.split(',').map(Number); if (!M.has(x + ',' + (y + 1))) put(x, y + 1, rgbHex(edge.map(v => v * q))); }
+  for (const k of M) {
+    const [x, y] = k.split(',').map(Number), sh = 0.5 + 0.5 * Math.sin((x - shimmerT * 16) * 0.22 - y * 0.4);
+    put(x, y, rgbHex(mixRGB(face[0], face[1], Math.round(sh * 3) / 3).map(v => v * q)));
+  }
+}
+// ---------- Fall Sale: maple leaves flutter down into a pile, FALL SALE appears ----------
+const LEAF_COLS = ['#ff7a00', '#c84a10', '#ffb020', '#e05a10'];
+function drawFallSale(fb, t, x0, y0, w, h, occ, fade) {
+  const T = t / 1000, fq = Math.round(fade * 7) / 7;
+  const put = (x, y, c) => { x = Math.round(x); y = Math.round(y); if (x < 0 || y < 0 || x >= w || y >= h || !occ(x0 + x, y0 + y)) return; fb[(x0 + x) + ',' + (y0 + y)] = fq < 1 ? shade(c, fq) : c; };
+  const txt = ez01((T - 3.8) / 1.4) * (1 - ez01((T - 12.6) / 1.0));
+  if (txt > 0) draw3DText(put, textMask('FALL SALE', 3, w - 3, 1, h - 6), [[255, 200, 90], [255, 240, 190]], [170, 60, 10], Math.round(txt * 6) / 6, T - 3.8);
+  const N = Math.round(w / 6.5), pile = new Float32Array(w);
+  const LEAF = ['...v...', '.v.v.v.', '.vvVvv.', 'vvvVvvv', '.vvVvv.', '..vVv..', '...s...'];   // a real maple leaf shape, 7 x 7, with a center vein
+  for (let i = 0; i < N; i++) {
+    const t0 = ghash(i * 7 + 1) * 7.0, fallS = 1.8 + ghash(i * 11 + 3) * 1.3, x00 = ghash(i * 13 + 5) * (w + 12) - 6, col = LEAF_COLS[i % 4];
+    const pal = { v: col, V: mixHex(col, '#ffe0a0', 0.45), s: '#6a3010' };
+    const land = t0 + (h - 5) / fallS, gone = 12.6 + ghash(i * 17) * 0.8;
+    if (T < t0 || T > gone + 0.5) continue;
+    if (T < land) {   // fluttering down: side-to-side sway, tilting and flipping as it goes
+      const k = T - t0, y = -3 + k * fallS, x = x00 + Math.sin(k * 2.6 + i) * 4 + k * 1.0;
+      const tilt = Math.sin(k * 2.6 + i) * 0.7, flipW = Math.cos(k * 2.6 + i);
+      drawSprite(put, LEAF, pal, x, y, Math.max(0.35, Math.abs(flipW)), 1, tilt, flipW < 0);
+    } else {   // settled in the pile along the bottom, then blown off at the end
+      const k = land - t0, xl = Math.round(x00 + Math.sin(k * 2.6 + i) * 4 + k * 1.0), blow = T > gone ? (T - gone) * 70 : 0;
+      const ph = Math.min(4, pile[Math.max(0, Math.min(w - 1, xl))]);
+      drawSprite(put, LEAF, pal, xl + blow, h - 3.5 - ph, 1, 0.75, (ghash(i * 3) - 0.5) * 1.6, i % 2 === 0);
+      for (let d = -3; d <= 3; d++) { const xi = xl + d; if (xi >= 0 && xi < w) pile[xi] += 0.7; }
+    }
+  }
+}
+// ---------- Turkey dragging a HAPPY THANKSGIVING banner across the sign ----------
+const TURKEY = [
+  '......rroorr....', '....rrooyyoorr..', '...rooyyrryyoor.', '..royyr....ryyor', '..roy..bbbb..yor', '.Wro..bbbbbb..or', 'WWrr.bbbbbbbb.rr',
+  'OWE..bbbbbbbbb..', 'RR..bbbbbbbbb...', 'R...bbbbbbbbb...', '.....bbbbbbb....', '.......l..l.....', '......ll.ll.....' ];
+function drawTurkeyBanner(fb, t, x0, y0, w, h, occ, fade) {
+  const T = t / 1000, fq = Math.round(fade * 7) / 7;
+  const put = (x, y, c) => { x = Math.round(x); y = Math.round(y); if (x < 0 || y < 0 || x >= w || y >= h || !occ(x0 + x, y0 + y)) return; fb[(x0 + x) + ',' + (y0 + y)] = fq < 1 ? shade(c, fq) : c; };
+  const BW = 150, speed = (w + 16 + BW + 20) / 15.5, tx = w + 2 - T * speed;   // he walks right to left the whole way
+  const TP = { r:'#b83010', o:'#ff8a00', y:'#ffd040', b:'#8a5426', W:'#e8e8f0', O:'#ffa000', E:'#101010', R:'#ff1818', l:'#ffa000' };
+  const step = Math.floor(T * 4) % 2, bob = step;
+  TURKEY.forEach((r, y) => [...r].forEach((ch, x) => {
+    if (ch === '.' || !TP[ch]) return;
+    let xx = tx + x, yy = y + 2 + (ch === 'l' ? 0 : bob * 0);
+    if (ch === 'l' && y === 12) xx += step ? 1 : -1;   // legs stepping
+    if ('WOER'.includes(ch)) yy += bob;                 // head bobbing
+    put(xx, yy, TP[ch]);
+  }));
+  // rope and banner trailing behind him
+  const bx = tx + 20; for (let x = tx + 14; x < bx; x++) put(x, 9 + Math.round(Math.sin(x * 0.6 + T * 6) * 0.6), '#a07040');
+  const M = textMask('HAPPY THANKSGIVING', 0, BW - 8, 0, 8, true, true);
+  for (let x = 0; x < BW; x++) {
+    const X = bx + x, wave = Math.round(Math.sin(x * 0.12 - T * 5) * 0.8);
+    if (X < -1 || X > w) continue;
+    put(X, 3 + wave, '#c84a10'); put(X, 14 + wave, '#c84a10');
+    if (x < BW - 8) for (let y = 0; y < 8; y++) if (M.has(x + ',' + y)) put(X + 4, 5 + y + wave, (x + y) % 9 === 0 ? '#ffffff' : '#ffd070');
+  }
+  put(bx, 3, '#a07040'); put(bx, 14, '#a07040');
+}
+// ---------- Snowman: rolls in piece by piece, builds himself, blows a swirl of snow that leaves MERRY X-MAS! ----------
+function drawSnowman(fb, t, x0, y0, w, h, occ, fade) {
+  const T = t / 1000, TAU = 6.283185307, end = 1 - ez01((T - 14.6) / 0.8), fq = Math.round(fade * end * 7) / 7;
+  if (fq <= 0) return;
+  // soft painter: float color buffer with coverage, so every edge is anti-aliased
+  const buf = new Float32Array(w * h * 3), cov = new Float32Array(w * h);
+  const blend = (x, y, rgb, a) => { if (x < 0 || y < 0 || x >= w || y >= h || a <= 0) return; const i = y * w + x; for (let k = 0; k < 3; k++) buf[i * 3 + k] = buf[i * 3 + k] * (1 - a) + rgb[k] * a; cov[i] = cov[i] + (1 - cov[i]) * a; };
+  const SS = 3, L = [-0.5, -0.62, 0.6];
+  const ball = (cx, cy, r, rollA, clipY) => {   // shaded snowball lit from the upper left, with a few marks that turn as it rolls
+    for (let y = Math.floor(cy - r - 1); y <= cy + r + 1; y++) for (let x = Math.floor(cx - r - 1); x <= cx + r + 1; x++) {
+      let n = 0, acc = [0, 0, 0];
+      for (let j = 0; j < SS; j++) for (let i = 0; i < SS; i++) {
+        const px = x + (i + 0.5) / SS, py = y + (j + 0.5) / SS, dx = (px - cx) / r, dy = (py - cy) / r, d2 = dx * dx + dy * dy;
+        if (d2 > 1 || (clipY !== undefined && py > clipY)) continue;
+        const nz = Math.sqrt(1 - d2), lit = Math.max(0, dx * L[0] + dy * L[1] + nz * L[2]);
+        let c = mixRGB([118, 134, 178], [248, 250, 255], Math.min(1, 0.18 + 0.85 * lit));
+        if (d2 > 0.8) c = mixRGB(c, [160, 175, 210], (d2 - 0.8) * 2.5);   // cool rim
+        if (rollA !== undefined) for (let m = 0; m < 3; m++) { const a = rollA + m * TAU / 3, mx = Math.cos(a) * 0.55, my = Math.sin(a) * 0.55; if ((dx - mx) ** 2 + (dy - my) ** 2 < 0.035) c = mixRGB(c, [150, 165, 200], 0.6); }
+        acc = acc.map((v, k) => v + c[k]); n++;
+      }
+      if (n) blend(x, y, acc.map(v => v / n), n / (SS * SS));
+    }
+  };
+  const stick = (xa, ya, xb, yb, wd = 0.75) => {   // anti-aliased twig
+    for (let y = Math.floor(Math.min(ya, yb) - 1); y <= Math.max(ya, yb) + 1; y++) for (let x = Math.floor(Math.min(xa, xb) - 1); x <= Math.max(xa, xb) + 1; x++) {
+      let n = 0;
+      for (let j = 0; j < SS; j++) for (let i = 0; i < SS; i++) {
+        const px = x + (i + 0.5) / SS, py = y + (j + 0.5) / SS, vx = xb - xa, vy = yb - ya, ll = vx * vx + vy * vy || 1;
+        const q = Math.max(0, Math.min(1, ((px - xa) * vx + (py - ya) * vy) / ll)), ex = xa + vx * q - px, ey = ya + vy * q - py;
+        if (ex * ex + ey * ey < wd * wd / 4) n++;
+      }
+      if (n) blend(x, y, [128, 78, 34], Math.min(1, n / (SS * SS) * 1.6));
+    }
+  };
+  const arm = (sx, sy, ang, len) => { const ex = sx + Math.cos(ang) * len, ey = sy + Math.sin(ang) * len; stick(sx, sy, ex, ey); stick(ex - Math.cos(ang) * 1.4, ey - Math.sin(ang) * 1.4, ex - Math.cos(ang) * 1.4 + Math.cos(ang - 0.9) * 1.6, ey - Math.sin(ang) * 1.4 + Math.sin(ang - 0.9) * 1.6, 0.6); return [ex, ey]; };
+  // ground: flat snow on the left, a small slope rising to the right
+  const gy = h - 1.6, sx0 = w - 16, ground = x => x < sx0 ? gy : gy - (x - sx0) * 0.26;
+  for (let x = 0; x < w; x++) for (let y = Math.floor(ground(x + 0.5)); y < h; y++) {
+    const top = y < ground(x + 0.5) + 1, a = top ? Math.min(1, ground(x + 0.5) + 1 - y) : 1;
+    blend(x, y, top ? [235, 240, 250] : (x * 7 + y * 3) % 9 === 0 ? [175, 188, 218] : [200, 210, 232], a);
+  }
+  const bx = w - 21, R1 = 3.2, R2 = 2.3, R3 = 1.7, y1 = gy - R1 + 0.3, y2 = y1 - R1 - R2 + 0.8, y3 = y2 - R2 - R3 + 0.7;
+  // 1) the big ball rolls down the slope and stops
+  const k1 = ez01((T - 0.3) / 2.3), x1 = bx + (1 - k1) * (w - bx + 6), yy1 = Math.min(y1, ground(x1) - R1 + 0.3);
+  if (T > 0.3) { for (let x = -4; x <= 4; x++) blend(Math.round(x1 + x), Math.round(gy), [150, 165, 200], 0.35 * (1 - Math.abs(x) / 5)); ball(x1, yy1, R1, -x1 / R1); }
+  // 2) the middle ball with one stick arm rolls in, bumps the big one, pops up and lands on top
+  let x2 = w + 8, yy2 = y2, roll2 = 0, armA = Math.PI + 0.35, landed = false;
+  if (T > 2.8) {
+    if (T < 4.4) { const k = ez01((T - 2.8) / 1.6); x2 = (w + 6) - k * (w + 6 - (bx + R1 + R2)); yy2 = ground(x2) - R2 + 0.3; roll2 = -x2 / R2; armA = roll2 + Math.PI; }
+    else if (T < 5.1) { const k = (T - 4.4) / 0.7; x2 = bx + R1 + R2 - k * (R1 + R2); yy2 = (gy - R2) + (y2 - (gy - R2)) * k - Math.sin(k * Math.PI) * 4.5; roll2 = -(bx + R1 + R2) / R2 - k * 5; armA = roll2 + Math.PI; }
+    else { x2 = bx; yy2 = y2 + (T < 5.3 ? Math.sin((T - 5.1) / 0.2 * Math.PI) * 0.6 : 0); landed = true; armA = Math.PI + 0.35; }
+  }
+  // the pieces waiting in the snow: head, the other arm, the carrot
+  const headRest = [bx - 9, gy - 0.6], stickRest = [bx - 15, gy - 0.4], carrotRest = [bx - 5, gy - 0.3];
+  let head = headRest, headOn = false, stick2 = null, carrotOn = false, tipTarget = null;
+  const sh = [bx - R2 + 0.3, y2 - 0.6];   // shoulder of the working arm
+  const reach = (from, to, k) => [from[0] + (to[0] - from[0]) * k, from[1] + (to[1] - from[1]) * k - Math.sin(k * Math.PI) * 3];
+  const restTip = [sh[0] + Math.cos(Math.PI + 0.35) * 5, sh[1] + Math.sin(Math.PI + 0.35) * 5];
+  if (landed) {
+    if (T < 5.5) tipTarget = restTip;
+    else if (T < 6.1) tipTarget = reach(restTip, headRest, ez01((T - 5.5) / 0.6));
+    else if (T < 7.0) { const k = ez01((T - 6.1) / 0.9); head = reach(headRest, [bx, y3], k); tipTarget = [head[0] - 1.5, head[1] + 1]; headOn = k >= 1; }
+    else headOn = true;
+    if (T >= 7.0 && T < 7.5) tipTarget = reach([bx - 1.5, y3 + 1], stickRest, ez01((T - 7.0) / 0.5));
+    if (T >= 7.5 && T < 8.2) { const k = ez01((T - 7.5) / 0.7), p = reach(stickRest, [bx + R2, y2 - 0.6], k); tipTarget = p; stick2 = p; }
+    if (T >= 8.2 && T < 8.6) tipTarget = reach([bx + R2, y2 - 0.6], carrotRest, ez01((T - 8.2) / 0.4));
+    if (T >= 8.6 && T < 9.1) { const k = ez01((T - 8.6) / 0.5), p = reach(carrotRest, [bx - R3 - 0.2, y3 + 0.2], k); tipTarget = p; }
+    if (T >= 9.1) { carrotOn = true; tipTarget = null; }
+  }
+  if (T > 2.8) ball(x2, yy2, R2, landed ? undefined : roll2);
+  // head: lying half-buried in the snow until he picks it up
+  if (!headOn) ball(head[0], head[1], R3, undefined, head === headRest ? gy : undefined); else ball(bx, y3, R3);
+  const hipsK = ez01((T - 12.2) / 0.45);   // hands on hips at the end
+  if (T > 2.8) {
+    if (hipsK > 0 && landed) {   // both arms bent, hands on his hips: proud
+      const elL = [bx - R2 - 2.2, y2 + 0.2], elR = [bx + R2 + 2.2, y2 + 0.2];
+      stick(sh[0], sh[1], elL[0], elL[1]); stick(elL[0], elL[1], bx - R1 + 1.0, y1 - R1 + 1.2);
+      stick(bx + R2 - 0.3, y2 - 0.6, elR[0], elR[1]); stick(elR[0], elR[1], bx + R1 - 1.0, y1 - R1 + 1.2);
+    } else {
+      if (landed && tipTarget) { stick(sh[0], sh[1], tipTarget[0], tipTarget[1]); }
+      else if (landed) arm(sh[0], sh[1], Math.PI + 0.35, 5);
+      else arm(x2 + Math.cos(armA) * R2, yy2 + Math.sin(armA) * R2, armA, 4.5);
+      if (stick2 && T < 8.2) stick(stick2[0] - 2, stick2[1] + 1.5, stick2[0] + 2, stick2[1] - 1.5);
+      else if (T >= 8.2) arm(bx + R2 - 0.3, y2 - 0.6, -0.35, 5);
+      else stick(stickRest[0] - 2.5, stickRest[1], stickRest[0] + 2.5, stickRest[1] - 0.6);
+    }
+  }
+  // face
+  if (headOn) {
+    const pop = ez01((T - 7.0) / 0.25);
+    blend(Math.round(bx - 0.9), Math.round(y3 - 0.6), [38, 38, 46], pop); blend(Math.round(bx + 0.7), Math.round(y3 - 0.6), [38, 38, 46], pop);
+    const blowing = T > 9.6 && T < 11.6;
+    if (blowing) blend(Math.round(bx - 0.6), Math.round(y3 + 1.0), [60, 60, 70], 1); else { blend(Math.round(bx - 0.8), Math.round(y3 + 1.1), [60, 60, 70], 0.8); blend(Math.round(bx + 0.2), Math.round(y3 + 1.2), [60, 60, 70], 0.8); }
+    [[bx, y2 - 1.2], [bx, y2 + 0.8], [bx, y1 - 1.0]].forEach(([cx, cy]) => blend(Math.round(cx), Math.round(cy), [55, 55, 64], 0.85));   // buttons
+  }
+  const carrotAt = carrotOn ? [bx - R3 - 0.2, y3 + 0.2] : (T >= 8.6 && T < 9.1 ? tipTarget : carrotRest);
+  if (carrotAt) { blend(Math.round(carrotAt[0]), Math.round(carrotAt[1]), [255, 120, 0], 1); blend(Math.round(carrotAt[0]) - 1, Math.round(carrotAt[1]), [255, 160, 40], 0.85); }
+  // 3) he blows a swirl of snowy smoke to the left, and it melts away into MERRY X-MAS! in snow-castle letters
+  const mouthX = bx - 1, mouthY = y3 + 1.0, P = SMOKE_PAL.Ggw;
+  const blow = ez01((T - 9.6) / 1.4), clear = ez01((T - 11.0) / 1.5), smokeOn = T > 9.6 && T < 12.6;
+  const M = textMask('MERRY X-MAS!', 2, bx - R1 - 3, 3, Math.floor(gy) - 1, false, true), txt = ez01((T - 11.0) / 1.2);
+  if (txt > 0) for (const k of M) {
+    const [x, y] = k.split(',').map(Number);
+    const topEdge = k2 => !M.has(k2);
+    if (topEdge(x + ',' + (y - 1)) && x % 2 === 1 && M.has((x - 1) + ',' + y) && M.has((x + 1) + ',' + y) && topEdge((x - 1) + ',' + (y - 1)) && topEdge((x + 1) + ',' + (y - 1))) continue;   // battlements along wide, flat tops
+    const up = !M.has(x + ',' + (y - 1)) || !M.has((x - 1) + ',' + y), dn = !M.has(x + ',' + (y + 1)) || !M.has((x + 1) + ',' + y);
+    const brick = y % 3 === 0 || (x + (Math.floor(y / 3) % 2) * 2) % 4 === 0;
+    const c = up ? [250, 252, 255] : dn ? [140, 156, 195] : brick ? [196, 207, 230] : [228, 235, 248];
+    blend(x, y, c, txt);
+  }
+  if (smokeOn) {
+    const front = mouthX - blow * (mouthX + 4), a = T * 0.9;
+    for (let y = 0; y < h; y++) for (let x = 0; x < Math.ceil(mouthX); x++) {
+      if (x < front) continue;
+      const dist = (mouthX - x) / (mouthX + 1), spread = 1.2 + dist * h * 0.55, dyv = Math.abs(y - (mouthY - dist * 2.5));
+      if (dyv > spread) continue;
+      const u = x / 16 + T * 0.25, v = y / 16;
+      const rib = 0.5 + 0.5 * Math.cos(TAU * (u + 0.5 * Math.sin(v * 2.4 + a * 1.3) + 0.35 * Math.sin(u * 3.1 - a)) - a * 3);
+      let g = Math.pow(Math.max(0, Math.min(1, (rib - 0.15) / 0.85)), 1.2) * (1 - dyv / spread) * (1 - clear);
+      g = Math.max(0, g - ghash(x * 31 + y * 7) * clear * 0.5);
+      if (g > 0.06) blend(x, y, gradRGB(P, Math.min(1, 0.55 + g * 0.45)), Math.min(1, g * 2.4));
+    }
+  }
+  if (txt > 0.6 && T < 14.4) for (let i = 0; i < 4; i++) {   // little glints on the snow letters
+    const pts = [...M]; const k = pts[Math.floor(ghash(i * 37 + Math.floor(T * 3)) * pts.length)];
+    if (k) { const [x, y] = k.split(',').map(Number); blend(x, y, [255, 255, 255], 1); }
+  }
+  // out to the sign, colors snapped to a small set so the clip stays compact
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x; if (cov[i] < 0.12 || !occ(x0 + x, y0 + y)) continue;
+    const c = [0, 1, 2].map(k => Math.round(buf[i * 3 + k] * Math.min(1, cov[i] * 1.15) * fq / 12) * 12);
+    if (c[0] + c[1] + c[2] > 18) fb[(x0 + x) + ',' + (y0 + y)] = rgbHex(c);
+  }
+}
+// ---------- Digital rain resolving into "##% OFF" ----------
+function drawRainOff(fb, t, type, x0, y0, w, h, occ, fade) {
+  const T = t / 1000, fq = Math.round(fade * 7) / 7, C = RAIN_COLS['rain' + type.slice(2)] || RAIN_COLS.rainG;
+  const put = (x, y, c) => { if (x < 0 || y < 0 || x >= w || y >= h || !occ(x0 + x, y0 + y)) return; fb[(x0 + x) + ',' + (y0 + y)] = fq < 1 ? shade(c, fq) : c; };
+  const pct = String(state.scene.pct || 40), M = textMask(pct + '% OFF', 2, w - 2, 1, h - 1, false, true);
+  const dim = T < 3 ? 1 : T < 8.2 ? 0.28 : 1, tail = 7;
+  for (let x = 0; x < w; x++) {
+    const per = 1.1 + ghash(x * 17) * 1.3, ph = ghash(x * 29 + 3) * per, sp = (h + tail + 2) / per;
+    const lockAt = 1.4 + ghash(x * 41 + 9) * 1.4, dropAt = 8.2 + ghash(x * 53 + 1) * 1.0;
+    for (let y = 0; y < h; y++) {
+      const key = x + ',' + y, isText = M.has(key);
+      const head = ((T + ph) % per) * sp - 2, d = head - y;
+      let c = null;
+      if (d >= 0 && d < tail && T < 9.6) {   // the falling bits
+        const bit = ghash(x * 31 + y * 7 + Math.floor(T * 14) * 101) > 0.4;
+        c = d < 1 ? rgbHex(mixRGB(C, [255, 255, 255], 0.6).map(v => v * dim)) : bit ? rgbHex(C.map(v => v * Math.max(0.25, 1 - d / tail) * dim)) : null;
+      }
+      if (isText && T > lockAt && T < dropAt) {   // the text locks in out of the code, glowing first
+        const age = T - lockAt, glow = Math.max(0, 1 - age / 0.6), flick = ghash(x * 7 + Math.floor(T * 3)) > 0.985 ? 0.5 : 1;
+        c = rgbHex(mixRGB(mixRGB(C, [255, 255, 255], 0.25), [255, 255, 255], Math.round(glow * 3) / 3).map(v => v * flick));
+      } else if (isText && T >= dropAt && T < dropAt + 0.6) {   // and drips away again
+        const k = (T - dropAt) / 0.6; if (ghash(x * 3 + y * 5) > k) c = rgbHex(C.map(v => v * (1 - k)));
+      }
+      if (c) put(x, y, c);
+    }
+  }
 }
 function drawFireplaceScene(fb, t, safe, x0, y0, w, h, occ, fade) {
   const T = t / 1000, fq = Math.round(fade * 7) / 7;
@@ -1441,6 +1732,10 @@ function sceneDraw(fb, t, type, x0, y0, w, h, occ) {   // draw a scene with a so
   if (FIRE_PAL[type]) { drawFire(fb, t, type, x0, y0, w, h, occ2, f); return; }
   if (type === 'FS') { drawFireSale(fb, t, type, x0, y0, w, h, occ2, f); return; }
   if (type === 'MF') { drawMoneyFlip(fb, t, x0, y0, w, h, occ2, f); return; }
+  if (type === 'FL') { drawFallSale(fb, t, x0, y0, w, h, occ2, f); return; }
+  if (type === 'TK') { drawTurkeyBanner(fb, t, x0, y0, w, h, occ2, f); return; }
+  if (type === 'SN') { drawSnowman(fb, t, x0, y0, w, h, occ2, f); return; }
+  if (/^DR[A-Z]$/.test(type)) { drawRainOff(fb, t, type, x0, y0, w, h, occ2, f); return; }
   if (type === 'GLb' || type === 'GLa') { drawGarland(fb, t, type === 'GLa', x0, y0, w, h, occ2, 1, 12); return; }   // loops seamlessly, so no fade
   if (type === 'GPb' || type === 'GPa') { drawPenguinScene(fb, t, type === 'GPa', x0, y0, w, h, occ2, 1); return; }
   if (type === 'GFb' || type === 'GFa') { drawFireplaceScene(fb, t, type === 'GFa', x0, y0, w, h, occ2, 1); return; }
@@ -2046,9 +2341,34 @@ function bigRaster(b, now) {   // -> columns of 16 colors|null
   return out;
 }
 // ---------- Pages mode: text in pages that change with a transition (like stadium boards) ----------
-const PAGE_TRANS = [['fade', 'Fade'], ['doors', 'Red / pewter doors'], ['slide', 'Slide up'], ['left', 'Push left'], ['dissolve', 'Pixel dissolve'], ['shine', 'Shine'], ['invg', 'Inverse flash (green)'], ['inva', 'Inverse flash (amber)']];
+const PAGE_FAMS = [   // page changes: pick the effect, then its color
+  ['Fade', [['fade', '']]], ['Pixel dissolve', [['dissolve', '']]], ['Shine', [['shine', '']]],
+  ['Diagonal doors', [['doors', 'Deep red / pewter'], ['doorsG', 'Gold / black'], ['doorsN', 'Navy / silver'], ['doorsE', 'Green / gold'], ['doorsP', 'Purple / gold'], ['doorsA', 'Amber / white (drive safe)']]],
+  ['Digital rain', [['rainG', 'Green'], ['rainC', 'Cyan'], ['rainA', 'Amber'], ['rainP', 'Purple'], ['rainW', 'White'], ['rainY', 'Gold']]],
+  ['Split-flap board', [['flap', '']]],
+  ['Racing stripes', [['strS', 'Silver / black'], ['strG', 'Gold / black'], ['strB', 'Blue / silver'], ['strE', 'Green / silver'], ['strA', 'Amber / white (drive safe)']]],
+  ['Light-bar wipe', [['barW', 'White'], ['barY', 'Gold'], ['barC', 'Cyan']]],
+  ['Center split', [['split', '']]], ['Venetian blinds', [['blinds', '']]], ['Scoreboard scramble', [['scramble', '']]],
+  ['Scanline', [['scanW', 'White'], ['scanG', 'Green'], ['scanA', 'Amber'], ['scanC', 'Cyan']]],
+  ['Bounce in', [['bounce', '']]], ['Sparkle in', [['sparkle', '']]],
+  ['Slide up', [['slide', '']]], ['Push left', [['left', '']]],
+  ['Inverse flash', [['invg', 'Green'], ['inva', 'Amber']]],
+  ['🍂 Leaf gust', [['leaves', '']]], ['❄ Snowfall', [['snow', '']]],
+  ['💡 Light-string chase', [['lights', 'Multicolor'], ['lightsA', 'White + amber (drive safe)']]] ];
+const PAGE_TRANS = famFlat(PAGE_FAMS);
 const INV = { invg:'#18c840', inva:'#ffa000' };   // next page: black letters on a solid band
-const TRANS_MS = { fade:700, doors:1300, slide:650, left:650, dissolve:900, shine:250, invg:520, inva:520 };
+const TRANS_MS = { fade:700, doors:1300, slide:650, left:650, dissolve:900, shine:250, invg:520, inva:520,
+  flap:1100, split:800, blinds:900, scramble:1200, bounce:900, sparkle:1000, leaves:1300, snow:1800, lights:1200, lightsA:1200 };
+['doorsG', 'doorsN', 'doorsE', 'doorsP', 'doorsA'].forEach(k => TRANS_MS[k] = 1300);
+['rainG', 'rainC', 'rainA', 'rainP', 'rainW', 'rainY'].forEach(k => TRANS_MS[k] = 1500);
+['strS', 'strG', 'strB', 'strE', 'strA'].forEach(k => TRANS_MS[k] = 1200);
+['barW', 'barY', 'barC'].forEach(k => TRANS_MS[k] = 800);
+['scanW', 'scanG', 'scanA', 'scanC'].forEach(k => TRANS_MS[k] = 900);
+const DOOR_COLS = { doors:['#b00000', '#7a8088'], doorsG:['#ffb000', '#050505'], doorsN:['#0a1a70', '#b8c0cc'], doorsE:['#00a040', '#ffb000'], doorsP:['#7000d0', '#ffb000'], doorsA:['#ff9000', '#f0f0f0'] };
+const RAIN_COLS = { rainG:[0, 230, 70], rainC:[0, 210, 255], rainA:[255, 150, 0], rainP:[170, 60, 255], rainW:[220, 225, 235], rainY:[255, 200, 30] };
+const STRIPE_COLS = { strS:['#c8ccd4', '#000000'], strG:['#ffb000', '#000000'], strB:['#2050ff', '#c8ccd4'], strE:['#00b050', '#c8ccd4'], strA:['#ff9000', '#f0f0f0'] };
+const BAR_COLS = { barW:[255, 255, 255], barY:[255, 200, 40], barC:[60, 230, 255] };
+const SCAN_COLS = { scanW:[255, 255, 255], scanG:[40, 255, 110], scanA:[255, 160, 20], scanC:[60, 230, 255] };
 const PAGE_STEP = 40;
 const hexRgb = c => { const v = parseInt(c.slice(1), 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
 const rgbHex = a => '#' + a.map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
@@ -2093,7 +2413,7 @@ function pageGrid(src, txt, W, H, t, inv) {   // one page, centered, as W column
   return g;
 }
 const mapGrid = (g, fn) => g.map((col, x) => col.map((c, y) => fn(c, x, y)));
-function doorsGrid(W, H, k, colA = '#d01020', colB = '#7a8088') {   // red/pewter pieces along the diagonal; k 0 = closed, 1.3 = open
+function doorsGrid(W, H, k, colA = '#b00000', colB = '#7a8088') {   // red/pewter pieces along the diagonal; k 0 = closed, 1.3 = open
   const g = blankGrid(W, H), xt = 0.65 * W, xb = 0.35 * W, dx = xb - xt, A = hexRgb(colA), B = hexRgb(colB);
   const side = (x, y) => x - (xt + dx * y / H);
   for (let x = 0; x < W; x++) for (let y = 0; y < H; y++) {
@@ -2110,6 +2430,119 @@ function doorsGrid(W, H, k, colA = '#d01020', colB = '#7a8088') {   // red/pewte
 }
 function transition(kind, A, B, f, W, H) {
   const e = easeIO(f);
+  const fresh = (b, cell) => b ? b : null;
+  if (RAIN_COLS[kind]) {   // digital rain: columns of falling 1s and 0s eat the old page and leave the new one behind
+    const C = RAIN_COLS[kind], tail = 6;
+    return mapGrid(A, (c, x, y) => {
+      const head = (f * 1.55 - ghash(x * 13 + 7) * 0.55) * (H + tail + 4) - 2, d = head - y;
+      if (d < 0) return c;   // the stream hasn't reached this dot yet
+      if (d < tail) {        // inside the stream: flickering bits, brightest at the head
+        const bit = ghash(x * 31 + y * 7 + Math.floor(f * 40) * 101) > 0.45;
+        if (d < 1) return rgbHex(mixRGB(C, [255, 255, 255], 0.65));
+        return bit ? rgbHex(C.map(v => v * Math.max(0.25, 1 - d / tail))) : (d < 2 ? rgbHex(C.map(v => v * 0.3)) : null);
+      }
+      const b = B[x][y]; if (!b) return null;
+      return d < tail + 4 ? mixHex(b, rgbHex(C), Math.round((1 - (d - tail) / 4) * 4) / 4) : b;   // new letters lock in glowing, then settle
+    });
+  }
+  if (kind === 'flap') {   // split-flap board: each 6-dot cell flips down, rippling left to right
+    const cellW = 6, n = Math.ceil(W / cellW), mid = H / 2;
+    return mapGrid(A, (c, x, y) => {
+      const cell = Math.floor(x / cellW), p = Math.max(0, Math.min(1, (f * 1.6 - cell / n * 0.6))), q = easeIO(p);
+      if (p <= 0) return c; if (p >= 1) return B[x][y];
+      if (q < 0.5) {   // top flap (old) folds down toward the middle; new top shows behind it
+        const sc = 1 - q * 2;
+        if (y < mid) { const sy = mid - (mid - y) / Math.max(sc, 0.05); return sy >= 0 && sy < mid && (mid - y) <= mid * sc + 0.5 ? (A[x][Math.floor(sy)] ? shade(A[x][Math.floor(sy)], 0.55 + 0.45 * sc) : null) : B[x][y]; }
+        return y === Math.floor(mid) && x % cellW !== cellW - 1 ? '#202020' : c;
+      }
+      const sc = q * 2 - 1;   // bottom flap (new) unfolds downward over the old bottom
+      if (y < mid) return B[x][y];
+      const sy = mid + (y - mid) / Math.max(sc, 0.05);
+      return (y - mid) <= (H - mid) * sc + 0.5 ? (sy < H && B[x][Math.floor(sy)] ? shade(B[x][Math.floor(sy)], 0.55 + 0.45 * sc) : null) : c;
+    });
+  }
+  if (STRIPE_COLS[kind]) {   // racing stripes: diagonal stripes slice in from alternating sides, then slide away
+    const [c1, c2] = STRIPE_COLS[kind], sw = 6, closing = f < 0.5, k = closing ? easeIO(f / 0.5) : 1 - easeIO((f - 0.5) / 0.5), base = closing ? A : B;
+    return mapGrid(base, (c, x, y) => {
+      const u = x + y * 0.8, band = Math.floor(u / sw), dir = band % 2 ? 1 : -1, reach = k * (W + 20);
+      const inside = dir > 0 ? (u - band * sw) >= 0 && x < reach - 10 : x > W - reach + 10;
+      if (!inside) return c;
+      const col = band % 2 ? c1 : c2; return col === '#000000' ? null : col;
+    });
+  }
+  if (BAR_COLS[kind]) {   // light-bar wipe: a bright bar sweeps across; the new page is already there behind it
+    const C = BAR_COLS[kind], bx = -4 + e * (W + 8);
+    return mapGrid(A, (c, x, y) => {
+      const d = x - (bx - (y - H / 2) * 0.35);
+      if (Math.abs(d) < 1.2) return rgbHex(C);
+      if (Math.abs(d) < 2.6) { const base = d < 0 ? B[x][y] : c; return rgbHex(mixRGB(base ? hexRgb(base) : [0, 0, 0], C, 0.45)); }
+      return d < 0 ? B[x][y] : c;
+    });
+  }
+  if (kind === 'split') {   // center split: the old page parts up and down, revealing the new one
+    const d = e * H / 2, mid = H / 2;
+    return mapGrid(A, (c, x, y) => {
+      if (y < mid) { const sy = y + d; return sy < mid ? A[x][Math.floor(sy)] : B[x][y]; }
+      const sy = y - d; return sy >= mid ? A[x][Math.floor(sy)] : B[x][y];
+    });
+  }
+  if (kind === 'blinds') {   // venetian blinds: slats tilt shut, then open on the new page
+    const slat = 4, open = Math.abs(Math.cos(Math.PI * e)), base = e < 0.5 ? A : B;
+    return mapGrid(base, (c, x, y) => (Math.abs((y % slat) + 0.5 - slat / 2) < open * slat / 2 + 0.05) ? c : (open < 0.25 && (y % slat) === 1 ? '#303438' : null));
+  }
+  if (kind === 'scramble') {   // scoreboard scramble: letters spin through random characters, then lock in left to right
+    const cellW = H >= 16 ? 12 : 6, scale = H >= 16 ? 2 : 1, CH = '0123456789ABCDEFGHJKLMNPRSTUVWXYZ#$%&';
+    return mapGrid(A, (c, x, y) => {
+      const cell = Math.floor(x / cellW), lock = 0.35 + cell / Math.ceil(W / cellW) * 0.6;
+      if (f > lock) return B[x][y];
+      const any = A[x][y] || B[x][y], colr = B[Math.min(W - 1, cell * cellW + 2)] && B[Math.min(W - 1, cell * cellW + 2)].find(Boolean) || A[x].find(Boolean) || '#ffffff';
+      const g = glyph(CH[Math.floor(ghash(cell * 17 + Math.floor(f * 30) * 7) * CH.length)]), gx = Math.floor((x - cell * cellW) / scale), gy = Math.floor((y - (H - 7 * scale) / 2) / scale);
+      const on = g[gx] && g[gx][gy];
+      return on ? colr : null;
+    });
+  }
+  if (SCAN_COLS[kind]) {   // scanline: the new page draws in row by row behind a bright line
+    const C = SCAN_COLS[kind], yl = e * (H + 1) - 0.5;
+    return mapGrid(A, (c, x, y) => y < Math.floor(yl) ? B[x][y] : y === Math.floor(yl) ? rgbHex(C) : (c ? shade(c, 0.6) : null));
+  }
+  if (kind === 'bounce') {   // the old page drops away, the new one falls in and bounces to a stop
+    if (f < 0.35) { const d = Math.round(easeIO(f / 0.35) * H); return mapGrid(A, (c, x, y) => y - d >= 0 ? A[x][y - d] : null); }
+    const g = (f - 0.35) / 0.65, b = Math.abs(Math.cos(g * Math.PI * 2.5)) * Math.pow(1 - g, 1.6), d = Math.round(-b * H);
+    return mapGrid(B, (c, x, y) => y - d >= 0 && y - d < H ? B[x][y - d] : null);
+  }
+  if (kind === 'sparkle') {   // the old page fades while sparkles pop on and reveal the new one
+    return mapGrid(A, (c, x, y) => {
+      const at = ghash(x * 29 + y * 13 + 3) * 0.7 + 0.15;
+      if (f > at + 0.12) return B[x][y];
+      if (f > at) return '#ffffff';
+      return c ? shade(c, 1 - easeIO(f / 0.85)) : null;
+    });
+  }
+  if (kind === 'leaves') {   // a gust of autumn leaves blows across and swaps the page
+    const LC = ['#ff7a00', '#c84a10', '#ffc020'], gx = -8 + e * (W + 16);
+    return mapGrid(A, (c, x, y) => {
+      const d = x - gx + Math.sin(y * 1.3) * 2;
+      if (Math.abs(d) < 5 && ghash(x * 7 + y * 11 + Math.floor(f * 20)) > 0.55) return LC[(x + y) % 3];
+      return d < 0 ? B[x][y] : c;
+    });
+  }
+  if (kind === 'snow') {   // snow piles up and buries the old page, then melts to reveal the new one
+    const burying = f < 0.5, lvl = burying ? easeIO(f / 0.5) : 1, base = burying ? A : B;
+    return mapGrid(base, (c, x, y) => {
+      const top = H - lvl * (H + 1) + Math.sin(x * 0.7) * 0.8;
+      const melt = burying ? 0 : (f - 0.5) / 0.5, die = ghash(x * 97 + y * 31) * 0.85;
+      if (y >= top && melt <= die) return melt > die - 0.08 && !burying ? '#ffffff' : ((x * 7 + y * 3) % 5 ? '#e8eef8' : '#b8c4dc');
+      if (burying && ghash(x * 5 + y * 17 + Math.floor(f * 30)) > 0.97) return '#ffffff';
+      return c;
+    });
+  }
+  if (kind === 'lights' || kind === 'lightsA') {   // a string of bulbs chases across; the new page follows it
+    const BC = kind === 'lights' ? ['#ff2020', '#20d040', '#3060ff', '#ffc000'] : ['#ffffff', '#ff9000'], hx = -3 + e * (W + 6), wy = y0 => Math.round(H / 2 + Math.sin(y0 * 0.35) * (H / 2 - 1.5));
+    return mapGrid(A, (c, x, y) => {
+      if (x <= hx && x > hx - W && y === wy(x)) return (x % 3 === 0) ? BC[Math.floor(x / 3 + f * 12) % BC.length] : '#304030';
+      return x < hx ? B[x][y] : c;
+    });
+  }
   if (kind === 'slide') { const d = Math.round(e * H); return mapGrid(A, (c, x, y) => { const ya = y + d, yb = y + d - H; return ya < H ? A[x][ya] : (yb >= 0 ? B[x][yb] : null); }); }
   if (kind === 'left') { const d = Math.round(e * W); return mapGrid(A, (c, x, y) => { const xa = x + d, xb = x + d - W; return xa < W ? A[xa][y] : (xb >= 0 ? B[xb][y] : null); }); }
   if (INV[kind]) {   // quick fade, a white pop, a blink of black, then the band snaps on
@@ -2119,9 +2552,9 @@ function transition(kind, A, B, f, W, H) {
     return B;
   }
   if (kind === 'dissolve') return mapGrid(A, (c, x, y) => (hsh(x * 31 + y * 17 + 5) % 1000) / 1000 < e ? B[x][y] : c);
-  if (kind === 'doors') {
+  if (DOOR_COLS[kind]) {
     const closing = f < 0.45, k = closing ? 1.3 * (1 - easeIO(f / 0.45)) : f < 0.55 ? 0 : 1.3 * easeIO((f - 0.55) / 0.45);
-    const D = doorsGrid(W, H, k), base = f < 0.5 ? A : B;
+    const D = doorsGrid(W, H, k, ...DOOR_COLS[kind]), base = f < 0.5 ? A : B;
     return mapGrid(base, (c, x, y) => D[x][y] || c);
   }
   // fade (and the quick crossfade before a shine)
@@ -2292,10 +2725,12 @@ function showScene() {
 }
 $('showScene').onclick = () => { showScene(); if (rx && dataCh) send('SHOW'); };
 function renderMfOpts() {   // the Money Flip sliders only show while that scene is picked
-  const on = state.scene.type === 'MF' || (state.scene.more || []).includes('MF');
+  const seq = [state.scene.type, ...(state.scene.more || [])], on = seq.includes('MF') || seq.some(k => /^DR[A-Z]$/.test(k));
+  const mfOnly = seq.includes('MF');
   $('mfOpts').hidden = !on; if (!on) return;
   $('mfPct').value = state.scene.pct; $('mfPl').textContent = state.scene.pct + '%';
   $('mfCol').value = state.scene.mcol; $('mfCl').textContent = MF_COLORS[state.scene.mcol][0];
+  $('mfCol').hidden = !mfOnly; $('mfCl').parentElement.hidden = !mfOnly;   // the color slider is for Money Flip; digital rain picks its color from the list
 }
 $('mfPct').oninput = e => { state.scene.pct = +e.target.value; renderMfOpts(); };
 $('mfCol').oninput = e => { state.scene.mcol = +e.target.value; renderMfOpts(); };
@@ -2331,7 +2766,7 @@ function renderScenePick() {
 })();
 
 // ---------- big screen card wiring ----------
-const PALETTE = ['#ffa000', '#ffd000', '#ff6a00', '#ff0000', '#ff3090', '#ff00ff', '#c040ff', '#7a2cff',
+const PALETTE = ['#ffa000', '#ffd000', '#ff6a00', '#ff0000', '#a00000', '#600000', '#ff3090', '#ff00ff', '#c040ff', '#7a2cff',
                  '#1e4bff', '#3aa0ff', '#00c8c8', '#00c896', '#00e05a', '#90ff20', '#ffffff', '#ffd8a0', '#a0a0a0'];
 let bigSel = null;   // picked swatch
 function renderBigChips() {
@@ -2350,7 +2785,7 @@ function renderBig() {
   $('bm0').className = 'sec' + (b.scroll || b.pages ? '' : ' on'); $('bm1').className = 'sec' + (b.scroll ? ' on' : ''); $('bm2').className = 'sec' + (b.pages ? ' on' : '');
   $('bigPageRow').style.display = b.pages ? 'block' : 'none'; $('bigHold').value = b.hold; $('bigHl').textContent = b.hold + 's';
   $('bigPagePick').innerHTML = '';
-  $('bigPagePick').appendChild(makePicker({ options: PAGE_TRANS, value: null, thumb: transThumb, label: '+ Page break',
+  $('bigPagePick').appendChild(makeFamPicker({ fams: PAGE_FAMS, value: null, thumb: transThumb, label: '+ Page break',
     onPick: k => { const p = Math.min(b._caret ?? b.text.length, b.text.length); b.text = b.text.slice(0, p) + ' {:' + k + '} ' + b.text.slice(p); b._caret = p + k.length + 5; $('bigText').value = b.text; renderBigChips(); resetSim(); drawPreview(); } }));
   $('bigGapRow').style.display = b.scroll ? 'block' : 'none';
   $('bigGap').value = GAPS.indexOf(b.gap); $('bigGl').textContent = GAPNAME[b.gap];
@@ -2410,7 +2845,7 @@ $('bigClr').onclick = () => {
 function renderAll() {
   while (state.lines.length < ROWS) state.lines.push(L(false, ''));
   renderGrid(); renderBig(); renderLines(); resetSim();
-  $('bright').value = state.bright; setGauge(state.bright);
+  $('bright').value = state.bright; setGauge(state.bright); $('gamma').checked = !!state.gamma;
   renderScenePick();
   $('every').value = state.scene.every; $('evl').textContent = state.scene.every; renderRep();
   drawPreview();
@@ -2477,7 +2912,8 @@ function encodeClip(frames, ms) {   // frames: [{w,h,px:[color|null]}] -> Uint8A
     if (map.size <= 255) { map.key = key; break; }
     q *= 2;
   }
-  const pal = [...map.keys()].map(k => k.split(',').map(Number));
+  const gm = v => state.gamma ? Math.round(255 * Math.pow(v / 255, 1.8)) : v;   // true-color mode: LED gamma correction
+  const pal = [...map.keys()].map(k => k.split(',').map(Number).map(gm));
   const bodies = frames.map(f => {
     const out = []; let run = 0, cur = -1;
     f.px.forEach(c => {
@@ -2512,7 +2948,7 @@ function bigClip() {
   return encodeClip(frames, CLIP_MS);
 }
 // ---------- stacked scenes: the first scene, then any added after it, played back to back as one clip ----------
-const slowStep = k => !!(LAVA_PAL[k] || SMOKE_PAL[k] || ROLL_PAL[k] || FIRE_PAL[k] || k === 'FS' || /^G[LPF]/.test(k));
+const slowStep = k => !!(LAVA_PAL[k] || SMOKE_PAL[k] || ROLL_PAL[k] || FIRE_PAL[k] || k === 'FS' || /^G[LPF]/.test(k) || ['FL', 'TK', 'SN'].includes(k) || /^DR[A-Z]$/.test(k));
 function sceneSeq() { return state.scene.type === '-' ? [] : [state.scene.type, ...(state.scene.more || [])]; }
 function seqLen(seq = sceneSeq()) { return seq.reduce((a, k) => a + sceneLen(k), 0) || 1; }
 function seqDraw(fb, t, x0, y0, w, h, occ, seq = sceneSeq()) {
