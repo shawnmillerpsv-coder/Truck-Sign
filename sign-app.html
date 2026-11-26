@@ -289,6 +289,7 @@ const PHONE = '555-123-4567';
 const L = (scroll, text, color = '#ffffff', speed = 5, gap = '1', anim = '$', font = 'classic') => ({ scroll, speed, color, text, gap, anim, font, pages:false, hold:2.5 });
 const BUILTIN = [   // blank starting layouts in the real data-chain order, seen from outside: panel 1 is top right
   { name:'3-3 blank (3-2-1 / 6-5-4)', layout:[[2,0],[1,0],[0,0],[2,1],[1,1],[0,1]], lines:[L(false, ''), L(false, ''), L(false, '')], bright:60, scene:{ type:'-', every:2 } },
+  { name:'I Fix flood (3-3)', layout:[[2,0],[1,0],[0,0],[2,1],[1,1],[0,1]], lines:[L(false, ''), L(false, ''), L(false, '')], bright:60, scene:{ type:'IF', every:2, forever:true } },
   { name:'4-2 blank (4-3-2-1 / 6-5)', layout:[[3,0],[2,0],[1,0],[0,0],[2,1],[1,1]], lines:[L(false, ''), L(false, ''), L(false, '')], bright:60, scene:{ type:'-', every:2 } },
 ];
 const ANIM_FAMS = [   // [name, [[key, color name], ...]] - one entry per item, a second drop-down picks the color
@@ -845,6 +846,7 @@ const SCENE_FAMS = [
   ['💨 Rolling smoke', [['Mbg', 'Blue-gray'], ['Mam', 'Amber (drive safe)'], ['Mlp', 'Lime + purple'], ['Mgw', 'Gray, white + blue'], ['Mcb', 'Cyan + dark blue']]],
   ['🔥 Fire', [['Krd', 'Red / orange'], ['Kam', 'Amber (drive safe)'], ['Klp', 'Lime + purple'], ['Kgw', 'Gray, white + blue'], ['Kcb', 'Cyan + dark blue']]],
   ['🔥 Fire sale', [['FS', '']]],
+  ['🌊 I Fix flood', [['IF', '']]],
   ['💵 Money Flip % OFF', [['MF', '']]],
   ['🎄 Garland', [['GLb', 'Blue + white lights'], ['GLa', 'Drive safe (white + amber)']]],
   ['🐧 Garland + penguin', [['GPb', 'Blue + white lights'], ['GPa', 'Drive safe (white + amber)']]],
@@ -962,7 +964,7 @@ function sceneBox() {
   const x0 = Math.min(...gxs) * PW, y0 = Math.min(...gys) * PH;
   return [x0, y0, (Math.max(...gxs) + 1) * PW - x0, (Math.max(...gys) + 1) * PH - y0];
 }
-const SCENE_LEN = { FL:14000, TK:15500, SN:15500, DRG:10000, DRC:10000, DRA:10000, DRP:10000, DRW:10000, DRY:10000, GLb:12000, GLa:12000, GPb:18000, GPa:18000, GFb:15000, GFa:15000, MF:11000, Glp:10000, Ggw:10000, Gcb:10000, Mbg:10000, Mam:10000, Mlp:10000, Mgw:10000, Mcb:10000, Krd:10000, Kam:10000, Klp:10000, Kgw:10000, Kcb:10000, FS:10500, Jlp:15040, Jgw:15040, Jcb:15040, G:10000, H:10000, J:15040, I:15040, Y:9600, U:9600, S:10000, X:7000, K:7000, N:9000, Q:7500, O:6500, Z:6500, A:8500, D:6500, '$':4500, R:5000, E:7500, F:6500, B:6500, W:11000, '~':4500, '*':4500, '>':4500 };
+const SCENE_LEN = { IF:23600, FL:14000, TK:15500, SN:15500, DRG:10000, DRC:10000, DRA:10000, DRP:10000, DRW:10000, DRY:10000, GLb:12000, GLa:12000, GPb:18000, GPa:18000, GFb:15000, GFa:15000, MF:11000, Glp:10000, Ggw:10000, Gcb:10000, Mbg:10000, Mam:10000, Mlp:10000, Mgw:10000, Mcb:10000, Krd:10000, Kam:10000, Klp:10000, Kgw:10000, Kcb:10000, FS:10500, Jlp:15040, Jgw:15040, Jcb:15040, G:10000, H:10000, J:15040, I:15040, Y:9600, U:9600, S:10000, X:7000, K:7000, N:9000, Q:7500, O:6500, Z:6500, A:8500, D:6500, '$':4500, R:5000, E:7500, F:6500, B:6500, W:11000, '~':4500, '*':4500, '>':4500 };
 const sceneLen = k => SCENE_LEN[k] || 4500;
 const hsh = n => { n = (n ^ 61) ^ (n >>> 16); n = Math.imul(n, 9); n ^= n >>> 4; n = Math.imul(n, 0x27d4eb2d); return (n ^ (n >>> 15)) >>> 0; };
 function shade(hexc, f) {
@@ -1723,6 +1725,55 @@ function drawFireplaceScene(fb, t, safe, x0, y0, w, h, occ, fade) {
     if (ph < 0.85 && G.interior.some(p => p[0] === sx && p[1] === sy)) put(sx, sy, ph < 0.5 ? '#ffd060' : '#ff8a20');
   }
 }
+// ---------- I FIX flood scene: hollow italic I FIX, flood -> FLOODED, swish -> HOMES, swish -> FAST, flood -> phone, wave, loop ----------
+const IFIX_PHONE = '321-222-7644';
+const ifxCache = {};
+function ifxMask(text, w, h, font, yb, hollow, holes) {
+  const key = [text, w, h, font, hollow, holes].join('|'); if (ifxCache[key]) return ifxCache[key];
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', { willReadFrequently:true });
+  x.font = font; const m = x.measureText(text).width, sx = Math.min(1, (w - 2) / m);
+  x.translate(w / 2, 0); x.scale(sx, 1); x.textAlign = 'center'; x.fillStyle = '#fff'; x.fillText(text, 0, yb);
+  const d = x.getImageData(0, 0, w, h).data, b = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) b[i] = d[i * 4 + 3] > 110 ? 1 : 0;
+  if (holes) for (let i = 0; i < w * h; i++) if (b[i] && ghash(i * 7 + 3) < 0.13) b[i] = 0;   // water-damaged pits
+  let out = b;
+  if (hollow) { out = new Uint8Array(w * h); for (let y = 0; y < h; y++) for (let xx = 0; xx < w; xx++) { if (!b[y * w + xx]) continue; let e = 0; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const X = xx + dx, Y = y + dy; if (X < 0 || Y < 0 || X >= w || Y >= h || !b[Y * w + X]) e = 1; } out[y * w + xx] = e; } }
+  return ifxCache[key] = out;
+}
+function ifxPage(name, w, h, t) {   // -> array w*h of [r,g,b] or null
+  const sc = h / 16, BIG = `italic 900 ${Math.round(19 * sc)}px "Arial Black", Arial, sans-serif`, IMP = `700 ${Math.round(17 * sc)}px Impact, "Arial Narrow", sans-serif`;
+  const p = new Array(w * h).fill(null), fill = (m, f) => { for (let i = 0; i < w * h; i++) if (m[i]) p[i] = f(i % w, Math.floor(i / w)); };
+  if (name === 'ifix' || name === 'fast') fill(ifxMask(name === 'ifix' ? 'I FIX' : 'FAST', w, h, BIG, h, true), () => [255, 255, 255]);
+  else if (name === 'flooded') fill(ifxMask('FLOODED', w, h, IMP, Math.round(15 * sc), false), (x, y) => { const k = y / h; return [20 + 30 * k, 90 + 60 * (1 - k), 255]; });
+  else if (name === 'homes') fill(ifxMask('HOMES', w, h, IMP, Math.round(15 * sc), false, true), (x, y) => y > h * 0.66 ? [70, 80, 85] : ghash(x * 31 + y * 17) < 0.3 ? [90, 60, 30] : [130, 92, 48]);
+  else {
+    const m = ifxMask(IFIX_PHONE, w, h, `700 ${Math.round(16 * sc)}px "Arial Narrow", Arial, sans-serif`, Math.round(14 * sc), false);
+    if (name === 'phone') fill(m, () => [255, 255, 255]);
+    else for (let xx = 0; xx < w; xx++) { const dy = Math.round(-4 * sc * Math.max(0, Math.sin((xx - t * 0.06) * 0.1))); for (let y = 0; y < h; y++) if (m[y * w + xx]) { const Y = y + dy; if (Y >= 0 && Y < h) p[Y * w + xx] = [255, 255, 255]; } }
+  }
+  return p;
+}
+const ifxWater = (x, t, depth) => depth < 1 ? [170, 230, 255] : [10, 60 + 50 * (1 - Math.min(1, depth / 10)) + 20 * Math.sin(x * 0.3 + t * 0.01), 180 + 60 * (1 - Math.min(1, depth / 10))];
+function floodMix(A, B, p, w, h, t, water) {   // water rises over A, then drains to reveal B
+  const rising = p < 0.5, lv = rising ? p * 2 : 1 - (p - 0.5) * 2, e = 1 - Math.pow(1 - lv, 2), out = (rising ? A : B).slice();
+  for (let x = 0; x < w; x++) { const surf = h - e * (h + 4) + 1.6 * Math.sin(x * 0.18 + t * 0.012) + 1.2 * Math.sin(x * 0.07 - t * 0.009); for (let y = 0; y < h; y++) if (y >= surf) out[y * w + x] = water(x, t, y - surf); }
+  return out;
+}
+function swishMix(A, B, p, w, h, t, water) {   // a wall of water sweeps right to left, the new page behind it
+  const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2, fr = w + 2 - e * (w + 30), out = new Array(w * h).fill(null);
+  for (let y = 0; y < h; y++) { const c = fr + 3 * Math.sin(y * 0.45 + t * 0.01); for (let x = 0; x < w; x++) { const i = y * w + x; out[i] = x < c ? A[i] : x < c + 14 ? water(x, t, x - c) : B[i]; } }
+  return out;
+}
+const IFX_SEQ = [['h', 'ifix', 2600], ['f', 'ifix', 'flooded', 2400], ['h', 'flooded', 1600], ['s', 'flooded', 'homes', 900], ['h', 'homes', 1600], ['s', 'homes', 'fast', 900], ['h', 'fast', 1600], ['f', 'fast', 'phone', 2400], ['h', 'phone', 2200], ['h', 'wave', 3000], ['h', 'phone', 2000], ['f', 'phone', 'ifix', 2400]];
+function drawIFix(fb, t, x0, y0, w, h, occ) {
+  let tt = t, s = IFX_SEQ[IFX_SEQ.length - 1];
+  for (const q of IFX_SEQ) { const d = q[q.length - 1]; if (tt < d) { s = q; break; } tt -= d; }
+  const d = s[s.length - 1], p = Math.min(1, tt / d);
+  const fr = s[0] === 'h' ? ifxPage(s[1], w, h, t) : (s[0] === 'f' ? floodMix : swishMix)(ifxPage(s[1], w, h, t), ifxPage(s[2], w, h, t), p, w, h, t, ifxWater);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const c = fr[y * w + x]; if (c && occ(x0 + x, y0 + y)) fb[(x0 + x) + ',' + (y0 + y)] = rgbHex(c.map(v => Math.round(v / 8) * 8)); }
+}
+function gridToFlat(g, W, H) { const a = new Array(W * H).fill(null); for (let x = 0; x < W; x++) for (let y = 0; y < H; y++) if (g[x][y]) a[y * W + x] = hexRgb(g[x][y]); return a; }
+function flatToGrid(a, W, H) { const g = blankGrid(W, H); for (let x = 0; x < W; x++) for (let y = 0; y < H; y++) if (a[y * W + x]) g[x][y] = rgbHex(a[y * W + x]); return g; }
 function sceneDraw(fb, t, type, x0, y0, w, h, occ) {   // draw a scene with a soft fade in and fade out
   const L = sceneLen(type), f = Math.max(0, Math.min(1, t / 250, (L - t) / 350));
   if (LAVA_PAL[type]) { drawLava(fb, t, type, x0, y0, w, h, occ || ((x, y) => x >= x0 && x < x0 + w && y >= y0 && y < y0 + h), f); return; }
@@ -1731,6 +1782,7 @@ function sceneDraw(fb, t, type, x0, y0, w, h, occ) {   // draw a scene with a so
   if (ROLL_PAL[type]) { drawRollSmoke(fb, t, type, x0, y0, w, h, occ2, f); return; }
   if (FIRE_PAL[type]) { drawFire(fb, t, type, x0, y0, w, h, occ2, f); return; }
   if (type === 'FS') { drawFireSale(fb, t, type, x0, y0, w, h, occ2, f); return; }
+  if (type === 'IF') { drawIFix(fb, t, x0, y0, w, h, occ2); return; }
   if (type === 'MF') { drawMoneyFlip(fb, t, x0, y0, w, h, occ2, f); return; }
   if (type === 'FL') { drawFallSale(fb, t, x0, y0, w, h, occ2, f); return; }
   if (type === 'TK') { drawTurkeyBanner(fb, t, x0, y0, w, h, occ2, f); return; }
@@ -2351,13 +2403,14 @@ const PAGE_FAMS = [   // page changes: pick the effect, then its color
   ['Center split', [['split', '']]], ['Venetian blinds', [['blinds', '']]], ['Scoreboard scramble', [['scramble', '']]],
   ['Scanline', [['scanW', 'White'], ['scanG', 'Green'], ['scanA', 'Amber'], ['scanC', 'Cyan']]],
   ['Bounce in', [['bounce', '']]], ['Sparkle in', [['sparkle', '']]],
+  ['🌊 Flood fill', [['flood', '']]], ['🌊 Swish left', [['swish', '']]],
   ['Slide up', [['slide', '']]], ['Push left', [['left', '']]],
   ['Inverse flash', [['invg', 'Green'], ['inva', 'Amber']]],
   ['🍂 Leaf gust', [['leaves', '']]], ['❄ Snowfall', [['snow', '']]],
   ['💡 Light-string chase', [['lights', 'Multicolor'], ['lightsA', 'White + amber (drive safe)']]] ];
 const PAGE_TRANS = famFlat(PAGE_FAMS);
 const INV = { invg:'#18c840', inva:'#ffa000' };   // next page: black letters on a solid band
-const TRANS_MS = { fade:700, doors:1300, slide:650, left:650, dissolve:900, shine:250, invg:520, inva:520,
+const TRANS_MS = { flood:2400, swish:900, fade:700, doors:1300, slide:650, left:650, dissolve:900, shine:250, invg:520, inva:520,
   flap:1100, split:800, blinds:900, scramble:1200, bounce:900, sparkle:1000, leaves:1300, snow:1800, lights:1200, lightsA:1200 };
 ['doorsG', 'doorsN', 'doorsE', 'doorsP', 'doorsA'].forEach(k => TRANS_MS[k] = 1300);
 ['rainG', 'rainC', 'rainA', 'rainP', 'rainW', 'rainY'].forEach(k => TRANS_MS[k] = 1500);
@@ -2431,6 +2484,7 @@ function doorsGrid(W, H, k, colA = '#b00000', colB = '#7a8088') {   // red/pewte
 function transition(kind, A, B, f, W, H) {
   const e = easeIO(f);
   const fresh = (b, cell) => b ? b : null;
+  if (kind === 'flood' || kind === 'swish') { const t = f * 2400; return flatToGrid((kind === 'flood' ? floodMix : swishMix)(gridToFlat(A, W, H), gridToFlat(B, W, H), f, W, H, t, ifxWater), W, H); }
   if (RAIN_COLS[kind]) {   // digital rain: columns of falling 1s and 0s eat the old page and leave the new one behind
     const C = RAIN_COLS[kind], tail = 6;
     return mapGrid(A, (c, x, y) => {
